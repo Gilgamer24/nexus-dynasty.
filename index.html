@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head><title>Nexus 3D</title><style>body{margin:0;overflow:hidden;background:#111}</style></head>
+<body>
+<script src="/socket.io/socket.io.js"></script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.150.1/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+const socket = io();
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff, 1));
+scene.add(new THREE.GridHelper(100, 100, 0x444444, 0x222222));
+
+let players = {}, myCube;
+
+socket.on('currentPlayers', (list) => { 
+    Object.keys(list).forEach(id => addPlayer(list[id], id === socket.id)); 
+});
+socket.on('newPlayer', p => addPlayer(p, false));
+socket.on('playerMoved', p => { if(players[p.id]) players[p.id].position.set(p.x, 1, p.z); });
+socket.on('playerDisconnected', id => { scene.remove(players[id]); delete players[id]; });
+
+function addPlayer(p, isMe) {
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), new THREE.MeshStandardMaterial({color: p.color}));
+    cube.position.set(p.x, 1, p.z); scene.add(cube);
+    if(isMe) myCube = cube; else players[p.id] = cube;
+}
+
+window.addEventListener('keydown', (e) => {
+    if(!myCube) return;
+    const s = 0.5;
+    if(e.key === 'ArrowUp') myCube.position.z -= s;
+    if(e.key === 'ArrowDown') myCube.position.z += s;
+    if(e.key === 'ArrowLeft') myCube.position.x -= s;
+    if(e.key === 'ArrowRight') myCube.position.x += s;
+    socket.emit('playerMovement', {x: myCube.position.x, z: myCube.position.z});
+});
+
+function animate() {
+    requestAnimationFrame(animate);
+    if(myCube) { camera.position.set(myCube.position.x, 5, myCube.position.z + 10); camera.lookAt(myCube.position); }
+    renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
