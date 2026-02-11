@@ -1,49 +1,118 @@
 <!DOCTYPE html>
 <html>
-<head><title>Nexus 3D</title><style>body{margin:0;overflow:hidden;background:#111}</style></head>
+<head>
+    <title>Nexus Dynasty - Open World</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Courier New', Courier, monospace; }
+        #gui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); color: #0f0; padding: 15px; border: 2px solid #0f0; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: white; border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: difference; }
+    </style>
+</head>
 <body>
+    <div id="gui">
+        > NEXUS_OS ALPHA v0.1<br>
+        > PIÈCES COLLECTÉES: <span id="coins">0</span><br>
+        > JOUEURS EN LIGNE: <span id="pcount">0</span>
+    </div>
+    <div id="crosshair"></div>
+
 <script src="/socket.io/socket.io.js"></script>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.150.1/build/three.module.js"}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
+
 <script type="module">
 import * as THREE from 'three';
+
 const socket = io();
+const simplex = new SimplexNoise();
 const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({antialias:true});
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xffffff, 1));
-scene.add(new THREE.GridHelper(100, 100, 0x444444, 0x222222));
+// LUMIÈRES
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(50, 100, 50);
+scene.add(sun, new THREE.AmbientLight(0xffffff, 0.5));
 
-let players = {}, myCube;
+// GÉNÉRATION TERRAIN (Style Minecraft)
+const world = new THREE.Group();
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+for(let x = -25; x < 25; x++) {
+    for(let z = -25; z < 25; z++) {
+        let h = Math.floor(simplex.noise2D(x/15, z/15) * 4);
+        const mat = new THREE.MeshStandardMaterial({ color: h > 0 ? 0x3a5a40 : 0x4a4e69 });
+        const block = new THREE.Mesh(boxGeo, mat);
+        block.position.set(x, h, z);
+        world.add(block);
+    }
+}
+scene.add(world);
 
-socket.on('currentPlayers', (list) => { 
-    Object.keys(list).forEach(id => addPlayer(list[id], id === socket.id)); 
-});
-socket.on('newPlayer', p => addPlayer(p, false));
-socket.on('playerMoved', p => { if(players[p.id]) players[p.id].position.set(p.x, 1, p.z); });
-socket.on('playerDisconnected', id => { scene.remove(players[id]); delete players[id]; });
+// VARIABLES JEU
+let myPlayer, otherPlayers = {}, coins = [];
+let score = 0;
 
-function addPlayer(p, isMe) {
-    const cube = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), new THREE.MeshStandardMaterial({color: p.color}));
-    cube.position.set(p.x, 1, p.z); scene.add(cube);
-    if(isMe) myCube = cube; else players[p.id] = cube;
+// GESTION DES PIÈCES
+function spawnCoin(id, x, y, z) {
+    const geo = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 });
+    const coin = new THREE.Mesh(geo, mat);
+    coin.position.set(x, y + 1, z);
+    coin.rotation.x = Math.PI / 2;
+    coin.userData = { id: id };
+    scene.add(coin);
+    coins.push(coin);
 }
 
-window.addEventListener('keydown', (e) => {
-    if(!myCube) return;
-    const s = 0.5;
-    if(e.key === 'ArrowUp') myCube.position.z -= s;
-    if(e.key === 'ArrowDown') myCube.position.z += s;
-    if(e.key === 'ArrowLeft') myCube.position.x -= s;
-    if(e.key === 'ArrowRight') myCube.position.x += s;
-    socket.emit('playerMovement', {x: myCube.position.x, z: myCube.position.z});
+// LOGIQUE MULTIJOUEUR
+socket.on('currentPlayers', (list) => {
+    Object.keys(list).forEach(id => {
+        const p = list[id];
+        const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 1, 4, 8), new THREE.MeshStandardMaterial({color: p.color}));
+        mesh.position.set(p.x, 2, p.z);
+        if(id === socket.id) myPlayer = mesh; 
+        else otherPlayers[id] = mesh;
+        scene.add(mesh);
+    });
+    document.getElementById('pcount').innerText = Object.keys(list).length;
 });
+
+// MOUVEMENTS & COLLISIONS SIMPLE
+const keys = {};
+window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+window.onkeyup = e => keys[e.key.toLowerCase()] = false;
 
 function animate() {
     requestAnimationFrame(animate);
-    if(myCube) { camera.position.set(myCube.position.x, 5, myCube.position.z + 10); camera.lookAt(myCube.position); }
+    
+    if(myPlayer) {
+        if(keys['z'] || keys['arrowup']) myPlayer.position.z -= 0.1;
+        if(keys['s'] || keys['arrowdown']) myPlayer.position.z += 0.1;
+        if(keys['q'] || keys['arrowleft']) myPlayer.position.x -= 0.1;
+        if(keys['d'] || keys['arrowright']) myPlayer.position.x += 0.1;
+
+        camera.position.lerp(new THREE.Vector3(myPlayer.position.x, myPlayer.position.y + 10, myPlayer.position.z + 10), 0.1);
+        camera.lookAt(myPlayer.position);
+
+        // Détection de ramassage de pièces (très basique)
+        coins.forEach((c, i) => {
+            if(myPlayer.position.distanceTo(c.position) < 1) {
+                scene.remove(c);
+                coins.splice(i, 1);
+                score += 10;
+                document.getElementById('coins').innerText = score;
+                // Ici on enverra au serveur plus tard pour la persistance
+            }
+            c.rotation.z += 0.05; // Animation de la pièce
+        });
+
+        socket.emit('playerMovement', {x: myPlayer.position.x, z: myPlayer.position.z});
+    }
+    
     renderer.render(scene, camera);
 }
 animate();
