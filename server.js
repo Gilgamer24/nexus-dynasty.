@@ -11,12 +11,18 @@ let db = { users: {} };
 io.on('connection', (socket) => {
     socket.on('login', (data) => {
         const { pseudo } = data;
+        // Création ou chargement du profil
         if (!db.users[pseudo]) {
-            db.users[pseudo] = { pseudo, gold: 100, food: 100, hp: 100, oreStock: 0, houses: [] };
+            db.users[pseudo] = { 
+                pseudo, gold: 100, food: 100, hp: 100, oreStock: 0, houses: [] 
+            };
         }
         socket.userId = pseudo;
         players[socket.id] = { id: socket.id, pseudo: pseudo, x: 0, z: 0 };
+        
+        // Envoi des données au joueur
         socket.emit('authSuccess', { me: db.users[pseudo], allPlayers: players });
+        // Informe les autres de l'arrivée du joueur
         socket.broadcast.emit('playerJoined', players[socket.id]);
     });
 
@@ -39,4 +45,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log("Nexus Tutorial Engine Online"));
+http.listen(PORT, () => console.log(`Serveur Nexus Dynasty lancé sur le port ${PORT}`));
