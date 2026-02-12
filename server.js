@@ -18,11 +18,7 @@ io.on('connection', (socket) => {
         }
         socket.userId = pseudo;
         players[socket.id] = { id: socket.id, pseudo: pseudo, x: 0, z: 0 };
-        
-        // On envoie les infos du joueur et la liste de TOUS les joueurs déjà connectés
         socket.emit('authSuccess', { me: db.users[pseudo], allPlayers: players });
-        
-        // On prévient les autres qu'un nouveau est arrivé
         socket.broadcast.emit('playerJoined', players[socket.id]);
     });
 
@@ -44,4 +40,4 @@ io.on('connection', (socket) => {
     });
 });
 
-http.listen(3000, () => console.log("Nexus Multi-Texture Engine Online"));
+http.listen(3000, () => console.log("Server Running - Multi & Mining Fix"));
