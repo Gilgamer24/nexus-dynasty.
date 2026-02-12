@@ -2,45 +2,56 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Nexus Dynasty : Économie Réelle</title>
+    <title>Nexus Dynasty : Architecture & Industrie</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; color: white; }
-        canvas { display: block; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Verdana', sans-serif; color: white; }
+        .panel { position: absolute; background: rgba(0, 10, 20, 0.95); border: 2px solid #00f2ff; padding: 15px; border-radius: 8px; pointer-events: auto; box-shadow: 0 0 15px rgba(0,242,255,0.3); }
         
-        /* Interface */
-        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; border-radius: 8px; pointer-events: auto; box-shadow: 0 0 15px #00f2ff44; }
-        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; font-size: 18px; pointer-events: none; }
-        #build-menu { bottom: 20px; left: 20px; width: 280px; }
+        /* Stats */
+        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; font-size: 16px; pointer-events: none; }
         
+        /* Menu */
+        #menu { bottom: 20px; left: 20px; width: 300px; }
         .btn { width: 100%; padding: 12px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn:hover { background: #00f2ff; color: #000; }
+        .btn:disabled { color: #444; border-color: #444; cursor: not-allowed; background: #050505; }
+        .btn:hover:not(:disabled) { background: #00f2ff; color: #000; }
+
+        /* Tutoriel */
+        #tuto-box { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); width: 350px; text-align: center; border: 3px solid #ffd700; z-index: 1000; display: none; }
         
+        /* Login */
         #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 12px; margin: 8px; width: 260px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; border-radius: 4px; }
+        input { padding: 12px; margin: 10px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; }
         
-        .val { color: #00f2ff; }
+        .cyan { color: #00f2ff; }
+        .gold { color: #ffd700; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="letter-spacing: 10px; color: #00f2ff; text-shadow: 0 0 20px #00f2ff;">NEXUS DYNASTY</h1>
-        <input type="text" id="pseudo" placeholder="NOM DU SOUVERAIN">
+        <h1 style="letter-spacing: 8px; color: #00f2ff;">NEXUS DYNASTY</h1>
+        <input type="text" id="pseudo" placeholder="PSEUDO">
         <input type="password" id="mdp" placeholder="MOT DE PASSE">
-        <button class="btn" style="width: 200px;" onclick="connect()">RÉGNER</button>
+        <button class="btn" style="width: 200px;" onclick="connect()">COMMENCER</button>
+    </div>
+
+    <div id="tuto-box" class="panel">
+        <h2 id="tuto-title" style="color: #ffd700; margin-top: 0;">BIENVENUE</h2>
+        <p id="tuto-text">Tu es ruiné. Marche vers un rocher gris et clique dessus pour extraire ton premier or !</p>
+        <button class="btn" onclick="nextTuto()">COMPRIS</button>
     </div>
 
     <div id="stats" class="panel">
-        <div>❤️ VIE: <span id="hp-txt" class="val">100</span></div>
-        <div>🍞 FAIM: <span id="food-txt" class="val">100</span></div>
-        <div>💰 OR: <span id="gold-txt" class="val">0</span></div>
-        <div>🤖 MINEURS: <span id="work-txt" class="val">0</span></div>
+        <span>❤️ VIE: <span id="hp-val" class="cyan">100</span></span>
+        <span>💰 OR: <span id="gold-val" class="gold">0</span></span>
+        <span>🤖 LOGEMENT: <span id="work-val" class="cyan">0</span> / <span id="capa-val" class="cyan">0</span></span>
     </div>
 
-    <div id="build-menu" class="panel">
-        <h3 style="margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; color: #00f2ff;">Gestion Industrielle</h3>
-        <button class="btn" onclick="addWorker()">RECRUTER MINEUR (150G)</button>
-        <button class="btn" onclick="buyFood()">ACHETER RATIONS (40G)</button>
+    <div id="menu" class="panel">
+        <button id="btn-house" class="btn" onclick="buildHouse()">🏠 CONSTRUIRE HUTTE (100G)</button>
+        <button id="btn-worker" class="btn" onclick="addWorker()" disabled>🤖 RECRUTER MINEUR (<span id="w-cost">100</span>G)</button>
+        <button class="btn" onclick="buyFood()">🍞 RATIONS (30G)</button>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -57,10 +68,9 @@ import * as THREE from 'three';
 
 const socket = io();
 let scene, camera, renderer, player, myStats;
-const workers = [];
-const ores = [];
+const workers = [], ores = [], houses = [];
+let tutoStep = 0;
 
-// Connexion
 window.connect = () => {
     const pseudo = document.getElementById('pseudo').value;
     const mdp = document.getElementById('mdp').value;
@@ -71,48 +81,64 @@ socket.on('authSuccess', (data) => {
     myStats = data;
     document.getElementById('login-screen').style.display = 'none';
     initGame();
+    if(myStats.gold === 0) showTuto();
 });
 
 function initGame() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000205);
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    scene.background = new THREE.Color(0x020408);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const amb = new THREE.AmbientLight(0xffffff, 0.4);
-    const light = new THREE.PointLight(0x00f2ff, 1.5, 50);
-    scene.add(amb, light);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+    sun.position.set(10, 20, 10);
+    scene.add(sun);
 
-    // Texture du sol (Grille Cyber-Herbe)
-    const cv = document.createElement('canvas');
-    cv.width = 256; cv.height = 256;
-    const ctx = cv.getContext('2d');
-    ctx.fillStyle = '#0a1a0a'; ctx.fillRect(0,0,256,256);
-    ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 1;
-    ctx.strokeRect(0,0,256,256);
-    const groundTex = new THREE.CanvasTexture(cv);
-    groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
-    groundTex.repeat.set(80, 80);
-
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({ map: groundTex }));
-    ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
+    // Sol avec Grille
+    const grid = new THREE.GridHelper(1000, 100, 0x00f2ff, 0x002222);
+    scene.add(grid);
 
     // Joueur
-    player = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({ color: 0x00f2ff }));
+    player = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
     player.position.y = 0.8;
     scene.add(player);
 
-    // Génération Minerais
-    const oreGeo = new THREE.DodecahedronGeometry(0.8);
-    for(let i=0; i<30; i++) {
-        const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({ color: 0x444444 }));
-        ore.position.set(Math.random()*120-60, 0.4, Math.random()*120-60);
+    // Génération Minerais (Blocs)
+    const oreGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+    for(let i=0; i<25; i++) {
+        const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({color: 0x444444}));
+        ore.position.set(Math.random()*100-50, 0.75, Math.random()*100-50);
         scene.add(ore);
         ores.push(ore);
     }
+
+    // Minage Manuel au Clic
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    window.onclick = (e) => {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(ores);
+        if(hits.length > 0) {
+            const target = hits[0].object;
+            target.scale.multiplyScalar(0.9);
+            myStats.gold += 5;
+            if(target.scale.x < 0.4) {
+                scene.remove(target);
+                ores.splice(ores.indexOf(target), 1);
+                // Respawn d'un nouveau bloc
+                const newOre = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({color: 0x444444}));
+                newOre.position.set(Math.random()*100-50, 0.75, Math.random()*100-50);
+                scene.add(newOre);
+                ores.push(newOre);
+            }
+            if(tutoStep === 1) nextTuto();
+        }
+    };
 
     const keys = {};
     window.onkeydown = e => keys[e.code] = true;
@@ -122,85 +148,116 @@ function initGame() {
         requestAnimationFrame(animate);
         
         if(myStats.hp > 0) {
-            const spd = 0.22;
-            if(keys['KeyW']) player.position.z -= spd;
-            if(keys['KeyS']) player.position.z += spd;
-            if(keys['KeyA']) player.position.x -= spd;
-            if(keys['KeyD']) player.position.x += spd;
+            const s = 0.2;
+            if(keys['KeyW']) player.position.z -= s;
+            if(keys['KeyS']) player.position.z += s;
+            if(keys['KeyA']) player.position.x -= s;
+            if(keys['KeyD']) player.position.x += s;
 
-            // IA MINEURS
+            // IA Mineurs
             workers.forEach(w => {
-                if(myStats.food > 0) {
-                    const target = w.carrying ? player : w.targetOre;
-                    const dist = w.mesh.position.distanceTo(target.position);
-                    
-                    if(dist > 1.5) {
-                        const dir = new THREE.Vector3().subVectors(target.position, w.mesh.position).normalize();
-                        w.mesh.position.add(dir.multiplyScalar(0.12));
-                        w.mesh.lookAt(target.position);
-                    } else {
-                        if(w.carrying) {
-                            myStats.gold += 35; // L'économie : un voyage rapporte 35G
-                            w.carrying = false;
-                            w.targetOre = ores[Math.floor(Math.random()*ores.length)];
-                        } else {
-                            w.carrying = true;
-                        }
-                    }
-                    w.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.005) * 0.1;
+                const target = w.carrying ? player : w.targetOre;
+                if(!target.parent && !w.carrying) w.targetOre = ores[0];
+                
+                const dist = w.mesh.position.distanceTo(target.position);
+                if(dist > 1.5) {
+                    const dir = new THREE.Vector3().subVectors(target.position, w.mesh.position).normalize();
+                    w.mesh.position.add(dir.multiplyScalar(0.12));
+                    w.mesh.lookAt(target.position);
+                } else {
+                    w.carrying = !w.carrying;
+                    if(!w.carrying) myStats.gold += 35;
                 }
             });
         }
 
         camera.position.lerp(new THREE.Vector3(player.position.x, 15, player.position.z + 20), 0.1);
         camera.lookAt(player.position);
-        light.position.copy(player.position).y = 5;
         renderer.render(scene, camera);
+        updateUI();
     }
     animate();
 
-    // Boucle de survie & Sync
+    // Boucle de survie
     setInterval(() => {
         if(myStats.hp > 0) {
-            // Consommation : Le souverain et ses mineurs mangent
-            myStats.food = Math.max(0, myStats.food - (0.5 + workers.length * 0.2));
-            if(myStats.food <= 0) myStats.hp = Math.max(0, myStats.hp - 1.5);
-            
-            updateUI();
+            myStats.food = Math.max(0, myStats.food - (0.4 + workers.length * 0.1));
+            if(myStats.food <= 0) myStats.hp = Math.max(0, myStats.hp - 1);
             socket.emit('updateStats', myStats);
         }
     }, 1000);
 }
 
-function updateUI() {
-    document.getElementById('hp-txt').innerText = Math.floor(myStats.hp);
-    document.getElementById('food-txt').innerText = Math.floor(myStats.food);
-    document.getElementById('gold-txt').innerText = Math.floor(myStats.gold);
-    document.getElementById('work-txt').innerText = workers.length;
+// LOGIQUE TUTORIEL
+function showTuto() {
+    document.getElementById('tuto-box').style.display = 'block';
 }
 
+window.nextTuto = () => {
+    tutoStep++;
+    const title = document.getElementById('tuto-title');
+    const text = document.getElementById('tuto-text');
+    
+    if(tutoStep === 1) {
+        title.innerText = "TRAVAIL MANUEL";
+        text.innerText = "Clique plusieurs fois sur un bloc gris pour gagner tes premiers 100G.";
+    } else if(tutoStep === 2) {
+        title.innerText = "HABITAT";
+        text.innerText = "Bien ! Maintenant, construis une HUTTE pour pouvoir loger des mineurs.";
+    } else {
+        document.getElementById('tuto-box').style.display = 'none';
+    }
+}
+
+// ACTIONS
+window.buildHouse = () => {
+    if(myStats.gold >= 100) {
+        myStats.gold -= 100;
+        const house = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), new THREE.MeshStandardMaterial({color: 0x8B4513}));
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 2, 4), new THREE.MeshStandardMaterial({color: 0xff4444}));
+        roof.position.y = 2.5; roof.rotation.y = Math.PI/4;
+        house.add(base, roof);
+        house.position.set(player.position.x, 1.5, player.position.z - 6);
+        scene.add(house);
+        houses.push({ level: 1 });
+        if(tutoStep === 2) nextTuto();
+    }
+};
+
 window.addWorker = () => {
-    if(myStats.gold >= 150) {
-        myStats.gold -= 150;
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.4 }));
-        mesh.position.set(player.position.x, 0.5, player.position.z);
-        scene.add(mesh);
-        workers.push({ mesh, targetOre: ores[Math.floor(Math.random()*ores.length)], carrying: false });
+    const cost = Math.floor(100 * Math.pow(1.15, workers.length));
+    const capa = houses.length * 5;
+    if(myStats.gold >= cost && workers.length < capa) {
+        myStats.gold -= cost;
+        const wMesh = new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({color: 0xffff00}));
+        wMesh.position.copy(player.position);
+        scene.add(wMesh);
+        workers.push({ mesh: wMesh, targetOre: ores[Math.floor(Math.random()*ores.length)], carrying: false });
     }
 };
 
 window.buyFood = () => {
-    if(myStats.gold >= 40) {
-        myStats.gold -= 40;
-        myStats.food = Math.min(100, myStats.food + 50);
+    if(myStats.gold >= 30) {
+        myStats.gold -= 30;
+        myStats.food = Math.min(100, myStats.food + 40);
     }
 };
 
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
+function updateUI() {
+    document.getElementById('hp-val').innerText = Math.floor(myStats.hp);
+    document.getElementById('gold-val').innerText = Math.floor(myStats.gold);
+    document.getElementById('work-val').innerText = workers.length;
+    
+    const capa = houses.length * 5;
+    document.getElementById('capa-val').innerText = capa;
+    
+    const wCost = Math.floor(100 * Math.pow(1.15, workers.length));
+    document.getElementById('w-cost').innerText = wCost;
+    
+    document.getElementById('btn-worker').disabled = (myStats.gold < wCost || workers.length >= capa);
+    document.getElementById('btn-house').disabled = (myStats.gold < 100);
+}
 </script>
 </body>
 </html>
