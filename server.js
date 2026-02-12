@@ -5,10 +5,9 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
+// Base de données en mémoire (pour une persistance après redémarrage serveur, il faudrait un fichier JSON ou MongoDB)
 let db = { 
-    users: {}, 
-    globalHouses: [],
-    market: [] // Liste des offres : { seller: 'Pseudo', price: 100, qty: 10 }
+    users: {} 
 };
 
 io.on('connection', (socket) => {
@@ -16,27 +15,29 @@ io.on('connection', (socket) => {
         const { pseudo } = data;
         if (!db.users[pseudo]) {
             db.users[pseudo] = { 
-                pseudo, gold: 50, food: 100, hp: 100, oreStock: 0 
+                pseudo, gold: 50, food: 100, hp: 100, oreStock: 0,
+                houses: [] // Liste des positions {x, z}
             };
         }
         socket.userId = pseudo;
-        socket.emit('authSuccess', { user: db.users[pseudo], houses: db.globalHouses, market: db.market });
+        socket.emit('authSuccess', db.users[pseudo]);
     });
 
-    socket.on('updateStats', (s) => {
-        if(socket.userId) db.users[socket.userId] = s;
+    // Sauvegarde les stats et les maisons
+    socket.on('saveAll', (data) => {
+        if(socket.userId) {
+            db.users[socket.userId] = data;
+        }
     });
 
-    // Système de Shop entre joueurs
-    socket.on('postOffer', (offer) => {
-        db.market.push({ ...offer, id: Date.now() });
-        io.emit('marketUpdate', db.market);
-    });
-
-    socket.on('buildGlobal', (h) => {
-        db.globalHouses.push(h);
-        socket.broadcast.emit('newHouse', h);
+    // Gestion du respawn (Reset stats mais garde les maisons)
+    socket.on('respawnRequest', () => {
+        if(socket.userId) {
+            let u = db.users[socket.userId];
+            u.hp = 100; u.food = 100; u.gold = 0; u.oreStock = 0;
+            socket.emit('authSuccess', u);
+        }
     });
 });
 
-http.listen(3000, () => console.log("Nexus Economy Online"));
+http.listen(3000, () => console.log("Nexus Server v8 - Persistance Active"));
