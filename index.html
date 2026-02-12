@@ -1,54 +1,38 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty : Adventure</title>
+    <title>Nexus Dynasty : Origins</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
-        #ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        
-        /* Menus */
-        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; color: #fff; padding: 15px; pointer-events: auto; border-radius: 10px; }
-        #stats-panel { top: 10px; left: 10px; width: 200px; }
-        #build-panel { bottom: 10px; left: 10px; width: 220px; }
-        #help-panel { top: 10px; right: 10px; width: 250px; font-size: 13px; }
-        
-        /* Barres de vie/faim */
-        .bar-bg { width: 100%; height: 12px; background: #222; margin: 5px 0; border-radius: 6px; overflow: hidden; border: 1px solid #444; }
-        #hp-bar { width: 100%; height: 100%; background: #ff4444; transition: 0.3s; }
-        #food-bar { width: 100%; height: 100%; background: #ffaa00; transition: 0.3s; }
-
-        .btn { width: 100%; padding: 8px; margin: 4px 0; background: #004466; color: white; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; }
-        .btn:hover { background: #00f2ff; color: #000; }
-        
-        #zone-tag { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; }
+        #hud { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 30px; border: 2px solid #00f2ff; color: white; z-index: 100; }
+        .side-panel { position: absolute; left: 15px; top: 80px; width: 230px; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; color: white; z-index: 100; border-radius: 12px; }
+        .bar-container { width: 100px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
+        #hp-fill { width: 100%; height: 100%; background: #ff4444; transition: 0.3s; }
+        #food-fill { width: 100%; height: 100%; background: #ffaa00; transition: 0.3s; }
+        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #004466; color: white; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        .btn:hover { background: #00f2ff; color: black; }
+        #pseudo-tag { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; text-shadow: 2px 2px #000; pointer-events: none; }
     </style>
 </head>
 <body>
 
-<div id="ui-overlay">
-    <div id="stats-panel" class="panel">
-        <b id="display-pseudo">Chargement...</b>
-        <div>❤️ Vie</div><div class="bar-bg"><div id="hp-bar"></div></div>
-        <div>🍞 Faim</div><div class="bar-bg"><div id="food-bar"></div></div>
-        <div style="color: #ffd700; margin-top: 5px;">💰 Or: <span id="gold-val">0</span></div>
+    <div id="hud">
+        <div>❤️ VIE <div class="bar-container"><div id="hp-fill"></div></div></div>
+        <div>🍞 FAIM <div class="bar-container"><div id="food-fill"></div></div></div>
+        <div>💰 OR: <span id="gold-val">0</span></div>
     </div>
 
-    <div id="help-panel" class="panel">
-        <b>GUIDE DE SURVIE</b><hr>
-        • <b>Centre (Vert) :</b> Zone de Paix (Construction).<br>
-        • <b>Extérieur (Gris) :</b> Zone d'Aventure (Faim accélérée).<br>
-        • <b>Action :</b> Cliquez sur le sol pour diriger la caméra.
-    </div>
+    <div id="pseudo-tag">Zone de Paix</div>
 
-    <div id="build-panel" class="panel">
-        <b>🏗️ CONSTRUCTIONS</b>
-        <button class="btn" onclick="orderBuild('farm')">FERME (50G)</button>
-        <button class="btn" onclick="orderBuild('mine')">MINE (80G)</button>
-        <button class="btn" style="background:#446600" onclick="sellFood()">VENDRE NOURRITURE</button>
+    <div class="side-panel">
+        <h3 style="margin:0 0 10px 0; color:#00f2ff">🏗️ EMPIRE</h3>
+        <p id="player-name">Pseudo: ...</p>
+        <button class="btn" onclick="build('farm')">FERME (50G)</button>
+        <button class="btn" onclick="build('mine')">MINE (80G)</button>
+        <button class="btn" style="background:#446600" onclick="sellFood()">VENDRE STOCK (+20G)</button>
+        <hr border="0" style="border-top:1px solid #333">
+        <small>Cliquer sur l'herbe pour bouger la caméra</small>
     </div>
-
-    <div id="zone-tag">ZONE DE PAIX</div>
-</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
@@ -56,73 +40,72 @@
 <script type="module">
 import * as THREE from 'three';
 
-// --- INITIALISATION & SAUVEGARDE ---
-let pseudo = localStorage.getItem('nexus_pseudo') || prompt("Ton Pseudo ?", "Voyageur");
+// --- SAUVEGARDE & CONNEXION ---
+const pseudo = localStorage.getItem('nexus_pseudo') || prompt("Entre ton Pseudo :", "Souverain");
 localStorage.setItem('nexus_pseudo', pseudo);
-let savedGold = parseInt(localStorage.getItem('nexus_gold')) || 100;
+const savedGold = parseInt(localStorage.getItem('nexus_gold')) || 100;
 
 const socket = io();
-socket.emit('join', { pseudo: pseudo, gold: savedGold });
+socket.emit('joinGame', { pseudo: pseudo, gold: savedGold });
 
+// --- SCÈNE 3D ---
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.position.set(10, 20, 10);
-scene.add(sun, new THREE.AmbientLight(0xffffff, 0.6));
+scene.add(sun);
 
-// --- TERRAIN ---
-// Centre vert (Safe), Extérieur gris (Aventure)
-const groundGeo = new THREE.PlaneGeometry(1000, 1000);
-const groundMat = new THREE.MeshStandardMaterial({ color: 0x333333 }); // Défaut Aventure
-const ground = new THREE.Mesh(groundGeo, groundMat);
+// --- MONDE ---
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({color: 0x44aa44}));
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-const safeZone = new THREE.Mesh(
-    new THREE.CircleGeometry(40, 32),
-    new THREE.MeshStandardMaterial({ color: 0x44aa44 })
-);
-safeZone.rotation.x = -Math.PI/2;
-safeZone.position.y = 0.01;
-scene.add(safeZone);
+// Cercle de construction (Zone de Paix)
+const circle = new THREE.Mesh(new THREE.CircleGeometry(30, 32), new THREE.MeshStandardMaterial({color: 0x55cc55}));
+circle.rotation.x = -Math.PI/2; circle.position.y = 0.01;
+scene.add(circle);
 
 // --- MODÈLES ---
-function createCharModel(color, isBuilder = false) {
+function createPlayerModel(color) {
     const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color: isBuilder ? 0xffff00 : color}));
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color}));
     body.position.y = 0.6;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color: 0xffdbac}));
+    head.position.y = 1.1;
+    g.add(body, head);
+    return g;
+}
+
+function createBuilderModel() {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.6, 0.4), new THREE.MeshStandardMaterial({color: 0xffff00}));
+    body.position.y = 0.3;
     g.add(body);
     return g;
 }
 
-function createBuilding(type) {
-    const g = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({color: type === 'farm' ? 0x8B4513 : 0x555555});
-    const base = new THREE.Mesh(new THREE.BoxGeometry(2, 1.5, 2), mat);
-    base.position.y = 0.75;
-    g.add(base);
-    return g;
-}
-
 // --- LOGIQUE JEU ---
-let myId = "";
 const players = {};
-let myStats = { hp: 100, food: 100, gold: savedGold };
+let myId = "";
+let myStats = { gold: savedGold, food: 100, hp: 100 };
+let yaw = 0;
 const keys = {};
 
-socket.on('init', d => { 
-    myId = d.id; 
-    document.getElementById('display-pseudo').innerText = d.pseudo;
+socket.on('initPlayer', d => {
+    myId = d.id;
+    document.getElementById('player-name').innerText = "Souverain: " + d.pseudo;
 });
 
-socket.on('currentPlayers', data => {
+socket.on('updatePlayerList', data => {
     Object.keys(data).forEach(id => {
         if(!players[id]) {
-            players[id] = createCharModel(data[id].color);
+            players[id] = createPlayerModel(data[id].color);
             scene.add(players[id]);
         }
     });
@@ -130,63 +113,45 @@ socket.on('currentPlayers', data => {
 
 socket.on('playerMoved', d => { if(players[d.id]) players[d.id].position.set(d.x, d.y, d.z); });
 
-// --- BOUCLE DE SURVIE ---
-setInterval(() => {
-    if(!myId) return;
-    const dist = players[myId].position.length();
-    const isSafe = dist < 40;
-    
-    document.getElementById('zone-tag').innerText = isSafe ? "ZONE DE PAIX" : "ZONE D'AVENTURE";
-    document.getElementById('zone-tag').style.color = isSafe ? "#00ff00" : "#ff4444";
-
-    myStats.food -= isSafe ? 0.2 : 1.5;
-    if(myStats.food <= 0) { myStats.food = 0; myStats.hp -= 2; }
-    
-    document.getElementById('hp-bar').style.width = myStats.hp + "%";
-    document.getElementById('food-bar').style.width = myStats.food + "%";
-    document.getElementById('gold-val').innerText = myStats.gold;
-    localStorage.setItem('nexus_gold', myStats.gold);
-
-    if(myStats.hp <= 0) { alert("Game Over !"); myStats.hp = 100; players[myId].position.set(0,0,0); }
-}, 1000);
-
-// --- CONSTRUCTION & ACTIONS ---
-window.orderBuild = (type) => {
+// --- ACTIONS ---
+window.build = (type) => {
     const cost = type === 'farm' ? 50 : 80;
-    if(myStats.gold < cost) return alert("Pas assez d'or !");
-    
+    if(myStats.gold < cost) return alert("Or insuffisant !");
     myStats.gold -= cost;
-    const builder = createCharModel(0, true);
+    
+    // Apparition du constructeur
+    const builder = createBuilderModel();
     builder.position.copy(players[myId].position);
     scene.add(builder);
     
-    const target = players[myId].position.clone().add(new THREE.Vector3(3, 0, 3));
-    
-    // Animation simple constructeur
-    let step = 0;
-    const interval = setInterval(() => {
+    const target = players[myId].position.clone().add(new THREE.Vector3(4, 0, 4));
+    let progress = 0;
+    const itv = setInterval(() => {
         builder.position.lerp(target, 0.1);
-        step++;
-        if(step > 30) {
-            clearInterval(interval);
-            const b = createBuilding(type);
-            b.position.copy(target);
+        progress++;
+        if(progress > 40) {
+            clearInterval(itv);
+            const b = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshStandardMaterial({color: type==='farm'?0x8B4513:0x555555}));
+            b.position.copy(target); b.position.y = 1;
             scene.add(b);
             scene.remove(builder);
-            if(type === 'farm') setInterval(() => { myStats.food = Math.min(100, myStats.food + 5); }, 5000);
+            if(type==='farm') setInterval(() => { myStats.food = Math.min(100, myStats.food+5); }, 5000);
         }
     }, 100);
 };
 
-window.sellFood = () => {
-    if(myStats.food > 50) {
-        myStats.food -= 30;
-        myStats.gold += 20;
-    } else { alert("Pas assez de nourriture à vendre !"); }
-};
+// --- BOUCLE PRINCIPALE ---
+setInterval(() => {
+    if(!myId) return;
+    myStats.food -= (players[myId].position.length() > 30) ? 1.5 : 0.2;
+    if(myStats.food <= 0) { myStats.food = 0; myStats.hp -= 2; }
+    
+    document.getElementById('hp-fill').style.width = myStats.hp + "%";
+    document.getElementById('food-fill').style.width = myStats.food + "%";
+    document.getElementById('gold-val').innerText = myStats.gold;
+    localStorage.setItem('nexus_gold', myStats.gold);
+}, 1000);
 
-// --- CONTROLES ---
-let yaw = 0;
 renderer.domElement.onclick = () => renderer.domElement.requestPointerLock();
 document.onmousemove = e => { if(document.pointerLockElement) yaw -= e.movementX * 0.003; };
 window.onkeydown = e => keys[e.code] = true;
@@ -197,17 +162,15 @@ function animate() {
     if(players[myId]) {
         const me = players[myId];
         const move = new THREE.Vector3();
-        if(keys['KeyW']) move.z -= 0.15;
-        if(keys['KeyS']) move.z += 0.15;
-        if(keys['KeyA']) move.x -= 0.15;
-        if(keys['KeyD']) move.x += 0.15;
-        
+        if(keys['KeyW']) move.z -= 0.15; if(keys['KeyS']) move.z += 0.15;
+        if(keys['KeyA']) move.x -= 0.15; if(keys['KeyD']) move.x += 0.15;
         move.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
         me.position.add(move);
-        
-        camera.position.copy(me.position).add(new THREE.Vector3(0, 5, 10).applyAxisAngle(new THREE.Vector3(0,1,0), yaw));
+        me.rotation.y = yaw;
+
+        camera.position.copy(me.position).add(new THREE.Vector3(0, 6, 12).applyAxisAngle(new THREE.Vector3(0,1,0), yaw));
         camera.lookAt(me.position);
-        socket.emit('playerMovement', { x: me.position.x, y: me.position.y, z: me.position.z });
+        socket.emit('move', { x: me.position.x, y: me.position.y, z: me.position.z });
     }
     renderer.render(scene, camera);
 }
