@@ -1,64 +1,66 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-    <title>Nexus Dynasty : Industrial AI</title>
+    <meta charset="UTF-8">
+    <title>Nexus Dynasty : Économie Réelle</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
-        #ui { position: absolute; inset: 0; pointer-events: none; color: white; }
-        .panel { position: absolute; background: rgba(0,0,0,0.85); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; pointer-events: auto; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; color: white; }
+        canvas { display: block; }
         
-        /* Barre de Stats */
-        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; font-size: 18px; box-shadow: 0 0 15px rgba(0,242,255,0.2); }
+        /* Interface */
+        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; border-radius: 8px; pointer-events: auto; box-shadow: 0 0 15px #00f2ff44; }
+        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; font-size: 18px; pointer-events: none; }
+        #build-menu { bottom: 20px; left: 20px; width: 280px; }
         
-        /* Menu Action */
-        #menu { bottom: 20px; left: 20px; width: 280px; }
-        .btn { width: 100%; padding: 12px; margin: 5px 0; background: #111; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 10px #00f2ff; }
-
-        /* Login */
-        #login-screen { position: absolute; inset: 0; background: radial-gradient(circle, #001a1a, #000); z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 12px; margin: 5px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; }
+        .btn { width: 100%; padding: 12px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background: #00f2ff; color: #000; }
         
-        .red { color: #ff4444; }
-        .green { color: #55ff55; }
-        .gold { color: #ffd700; }
-        .cyan { color: #00f2ff; }
+        #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { padding: 12px; margin: 8px; width: 260px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; border-radius: 4px; }
+        
+        .val { color: #00f2ff; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="color:#00f2ff; letter-spacing:8px; text-shadow: 0 0 10px #00f2ff;">NEXUS DYNASTY</h1>
-        <input type="text" id="pseudo" placeholder="PSEUDO">
+        <h1 style="letter-spacing: 10px; color: #00f2ff; text-shadow: 0 0 20px #00f2ff;">NEXUS DYNASTY</h1>
+        <input type="text" id="pseudo" placeholder="NOM DU SOUVERAIN">
         <input type="password" id="mdp" placeholder="MOT DE PASSE">
-        <button class="btn" onclick="connect()" style="width:200px">REJOINDRE</button>
+        <button class="btn" style="width: 200px;" onclick="connect()">RÉGNER</button>
     </div>
 
-    <div id="ui">
-        <div id="stats" class="panel">
-            <span class="red">❤️ <span id="hp">100</span></span>
-            <span class="green">🍞 <span id="food">100</span></span>
-            <span class="gold">💰 <span id="gold">0</span></span>
-            <span class="cyan">🤖 <span id="work-count">0</span></span>
-        </div>
+    <div id="stats" class="panel">
+        <div>❤️ VIE: <span id="hp-txt" class="val">100</span></div>
+        <div>🍞 FAIM: <span id="food-txt" class="val">100</span></div>
+        <div>💰 OR: <span id="gold-txt" class="val">0</span></div>
+        <div>🤖 MINEURS: <span id="work-txt" class="val">0</span></div>
+    </div>
 
-        <div id="menu" class="panel">
-            <button class="btn" onclick="addWorker()">EMBAUCHER MINEUR (100G)</button>
-            <button class="btn" onclick="buyFood()">RAVITAILLEMENT (30G)</button>
-        </div>
+    <div id="build-menu" class="panel">
+        <h3 style="margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; color: #00f2ff;">Gestion Industrielle</h3>
+        <button class="btn" onclick="addWorker()">RECRUTER MINEUR (150G)</button>
+        <button class="btn" onclick="buyFood()">ACHETER RATIONS (40G)</button>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"
+    }
+}
+</script>
 
 <script type="module">
 import * as THREE from 'three';
 
 const socket = io();
-let scene, camera, renderer, player, stats;
+let scene, camera, renderer, player, myStats;
 const workers = [];
 const ores = [];
 
+// Connexion
 window.connect = () => {
     const pseudo = document.getElementById('pseudo').value;
     const mdp = document.getElementById('mdp').value;
@@ -66,65 +68,48 @@ window.connect = () => {
 };
 
 socket.on('authSuccess', (data) => {
-    stats = data;
+    myStats = data;
     document.getElementById('login-screen').style.display = 'none';
-    init();
+    initGame();
 });
 
-function init() {
+function initGame() {
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    scene.background = new THREE.Color(0x000205);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Lumières
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const sun = new THREE.DirectionalLight(0xffffff, 1);
-    sun.position.set(10, 20, 10);
-    scene.add(sun);
+    const amb = new THREE.AmbientLight(0xffffff, 0.4);
+    const light = new THREE.PointLight(0x00f2ff, 1.5, 50);
+    scene.add(amb, light);
 
-    // --- TEXTURE DE SOL HAUTE QUALITÉ ---
-    const canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    
-    // Fond vert sombre
-    ctx.fillStyle = '#122412'; ctx.fillRect(0,0,512,512); 
-    
-    // Grille Cyber
-    ctx.strokeStyle = 'rgba(0, 242, 255, 0.2)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0,0,512,512);
-    
-    // Détails d'herbe
-    for(let i=0; i<1500; i++) {
-        ctx.fillStyle = `rgba(0, ${Math.random()*100+40}, 20, 0.4)`;
-        ctx.fillRect(Math.random()*512, Math.random()*512, 3, 3);
-    }
-    
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(60, 60);
+    // Texture du sol (Grille Cyber-Herbe)
+    const cv = document.createElement('canvas');
+    cv.width = 256; cv.height = 256;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#0a1a0a'; ctx.fillRect(0,0,256,256);
+    ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 1;
+    ctx.strokeRect(0,0,256,256);
+    const groundTex = new THREE.CanvasTexture(cv);
+    groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+    groundTex.repeat.set(80, 80);
 
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshStandardMaterial({map: tex}));
-    ground.rotation.x = -Math.PI/2;
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({ map: groundTex }));
+    ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
-    // Joueur (Capsule Cyan)
-    player = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.4, 0.8), 
-        new THREE.MeshStandardMaterial({color: 0x00f2ff, emissive: 0x00f2ff, emissiveIntensity: 0.3})
-    );
+    // Joueur
+    player = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({ color: 0x00f2ff }));
     player.position.y = 0.8;
     scene.add(player);
 
-    // Création des Minerais (Cibles des mineurs)
-    const oreGeo = new THREE.IcosahedronGeometry(1, 0);
-    const oreMat = new THREE.MeshStandardMaterial({color: 0x333333, roughness: 0.8});
-    for(let i=0; i<20; i++) {
-        const ore = new THREE.Mesh(oreGeo, oreMat);
-        ore.position.set(Math.random()*100-50, 0.5, Math.random()*100-50);
+    // Génération Minerais
+    const oreGeo = new THREE.DodecahedronGeometry(0.8);
+    for(let i=0; i<30; i++) {
+        const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({ color: 0x444444 }));
+        ore.position.set(Math.random()*120-60, 0.4, Math.random()*120-60);
         scene.add(ore);
         ores.push(ore);
     }
@@ -136,96 +121,86 @@ function init() {
     function animate() {
         requestAnimationFrame(animate);
         
-        if(stats.hp > 0) {
-            // Déplacement Joueur
-            const s = 0.25;
-            if(keys['KeyW']) player.position.z -= s;
-            if(keys['KeyS']) player.position.z += s;
-            if(keys['KeyA']) player.position.x -= s;
-            if(keys['KeyD']) player.position.x += s;
+        if(myStats.hp > 0) {
+            const spd = 0.22;
+            if(keys['KeyW']) player.position.z -= spd;
+            if(keys['KeyS']) player.position.z += spd;
+            if(keys['KeyA']) player.position.x -= spd;
+            if(keys['KeyD']) player.position.x += spd;
 
-            // --- IA DES MINEURS ---
+            // IA MINEURS
             workers.forEach(w => {
-                if (stats.food > 0) {
-                    // Si plein d'or -> va vers le joueur. Si vide -> va vers le minerai.
+                if(myStats.food > 0) {
                     const target = w.carrying ? player : w.targetOre;
                     const dist = w.mesh.position.distanceTo(target.position);
                     
-                    if (dist > 1.8) {
+                    if(dist > 1.5) {
                         const dir = new THREE.Vector3().subVectors(target.position, w.mesh.position).normalize();
-                        w.mesh.position.add(dir.multiplyScalar(0.12)); // Vitesse mineur
+                        w.mesh.position.add(dir.multiplyScalar(0.12));
                         w.mesh.lookAt(target.position);
                     } else {
-                        // Contact !
-                        if (w.carrying) {
-                            stats.gold += 25; // Gain d'or
+                        if(w.carrying) {
+                            myStats.gold += 35; // L'économie : un voyage rapporte 35G
                             w.carrying = false;
-                            // Change de cible pour le prochain tour
                             w.targetOre = ores[Math.floor(Math.random()*ores.length)];
                         } else {
-                            w.carrying = true; // A miné le rocher
+                            w.carrying = true;
                         }
                     }
-                    // Animation de flottement
-                    w.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.005) * 0.2;
+                    w.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.005) * 0.1;
                 }
             });
         }
 
         camera.position.lerp(new THREE.Vector3(player.position.x, 15, player.position.z + 20), 0.1);
         camera.lookAt(player.position);
+        light.position.copy(player.position).y = 5;
         renderer.render(scene, camera);
     }
     animate();
 
-    // Boucle de survie
+    // Boucle de survie & Sync
     setInterval(() => {
-        if(stats.hp > 0) {
-            // Plus de mineurs = plus de consommation de nourriture
-            stats.food = Math.max(0, stats.food - (0.4 + workers.length * 0.15));
-            
-            // Si famine, la vie baisse
-            if(stats.food <= 0) stats.hp = Math.max(0, stats.hp - 2);
+        if(myStats.hp > 0) {
+            // Consommation : Le souverain et ses mineurs mangent
+            myStats.food = Math.max(0, myStats.food - (0.5 + workers.length * 0.2));
+            if(myStats.food <= 0) myStats.hp = Math.max(0, myStats.hp - 1.5);
             
             updateUI();
-            socket.emit('updateStats', stats);
+            socket.emit('updateStats', myStats);
         }
     }, 1000);
 }
 
+function updateUI() {
+    document.getElementById('hp-txt').innerText = Math.floor(myStats.hp);
+    document.getElementById('food-txt').innerText = Math.floor(myStats.food);
+    document.getElementById('gold-txt').innerText = Math.floor(myStats.gold);
+    document.getElementById('work-txt').innerText = workers.length;
+}
+
 window.addWorker = () => {
-    if(stats.gold >= 100) {
-        stats.gold -= 100;
-        const mesh = new THREE.Mesh(
-            new THREE.BoxGeometry(0.6, 0.6, 0.6), 
-            new THREE.MeshStandardMaterial({color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.5})
-        );
+    if(myStats.gold >= 150) {
+        myStats.gold -= 150;
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.4 }));
         mesh.position.set(player.position.x, 0.5, player.position.z);
         scene.add(mesh);
-        
-        workers.push({
-            mesh: mesh,
-            targetOre: ores[Math.floor(Math.random()*ores.length)],
-            carrying: false
-        });
-        updateUI();
+        workers.push({ mesh, targetOre: ores[Math.floor(Math.random()*ores.length)], carrying: false });
     }
 };
 
 window.buyFood = () => {
-    if(stats.gold >= 30) {
-        stats.gold -= 30;
-        stats.food = Math.min(100, stats.food + 50);
-        updateUI();
+    if(myStats.gold >= 40) {
+        myStats.gold -= 40;
+        myStats.food = Math.min(100, myStats.food + 50);
     }
 };
 
-function updateUI() {
-    document.getElementById('hp').innerText = Math.floor(stats.hp);
-    document.getElementById('food').innerText = Math.floor(stats.food);
-    document.getElementById('gold').innerText = stats.gold;
-    document.getElementById('work-count').innerText = workers.length;
-}
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
 </script>
 </body>
 </html>
