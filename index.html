@@ -1,56 +1,59 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty : Final Edition</title>
+    <title>Nexus Dynasty : Master Builder</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial', sans-serif; }
+        #ui { position: absolute; inset: 0; pointer-events: none; color: white; }
+        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; pointer-events: auto; }
         
-        /* Ecran de Mort */
-        #death-screen { 
-            display: none; position: absolute; inset: 0; 
-            background: rgba(139, 0, 0, 0.95); z-index: 9999; 
-            flex-direction: column; align-items: center; justify-content: center; color: white; 
-        }
-        #death-screen h1 { font-size: 80px; text-shadow: 5px 5px #000; margin: 0; }
+        /* Stats */
+        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; font-size: 20px; }
+        
+        /* Menu Construction */
+        #build-menu { bottom: 20px; left: 20px; width: 220px; }
+        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #004466; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background: #00f2ff; color: #000; }
 
-        /* Login */
-        #login-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; background: #111; color: #00f2ff; }
+        /* Login & Death */
+        #overlay { position: absolute; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { padding: 12px; margin: 5px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; }
         
-        /* HUD */
-        .ui { position: absolute; background: rgba(0,0,0,0.85); border: 2px solid #00f2ff; border-radius: 10px; color: white; padding: 15px; pointer-events: auto; }
-        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; font-size: 18px; }
-        #nav { right: 15px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; }
-        
-        .btn { padding: 12px; background: #222; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; border-radius: 5px; font-weight: bold; }
-        .btn:hover { background: #00f2ff; color: black; }
-        input { padding: 10px; margin: 5px; border: 1px solid #00f2ff; background: #000; color: white; width: 250px; }
+        #nav { right: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="death-screen">
-        <h1>TU ES MORT</h1>
-        <p style="font-size: 20px;">Tu as perdu 40% de tes richesses...</p>
-        <button class="btn" onclick="confirmRespawn()" style="font-size: 25px; padding: 20px 40px;">RENAÎTRE</button>
-    </div>
-
-    <div id="login-screen">
-        <h1 style="letter-spacing: 5px;">NEXUS DYNASTY</h1>
-        <input type="text" id="pseudo" placeholder="NOM DE SOUVERAIN">
+    <div id="overlay">
+        <h1 style="color:#00f2ff; letter-spacing: 5px;">NEXUS DYNASTY</h1>
+        <input type="text" id="pseudo" placeholder="PSEUDO">
         <input type="password" id="mdp" placeholder="MOT DE PASSE">
-        <button class="btn" onclick="doLogin()">COMMENCER L'AVENTURE</button>
+        <button class="btn" onclick="connect()" style="width:200px">REJOINDRE</button>
     </div>
 
-    <div id="stats" class="ui">
-        <div style="color: #ff4444;">❤️ <span id="hp">100</span></div>
-        <div style="color: #ffaa00;">🍞 <span id="food">100</span></div>
-        <div style="color: #ffd700;">💰 <span id="gold">0</span></div>
+    <div id="death-screen" style="display:none; position:absolute; inset:0; background:rgba(150,0,0,0.9); z-index:2000; flex-direction:column; align-items:center; justify-content:center; color:white;">
+        <h1 style="font-size:60px">GAME OVER</h1>
+        <p>Tu as perdu 40% de ton or.</p>
+        <button class="btn" onclick="respawn()" style="width:200px">RESPAWN</button>
     </div>
 
-    <div id="nav" class="ui">
-        <button class="btn" onclick="changeZone('farm')">🚜 FERME</button>
-        <button class="btn" onclick="changeZone('adventure')">⛏️ MINE</button>
-        <button class="btn" onclick="changeZone('pvp')">⚔️ PVP</button>
+    <div id="ui">
+        <div id="stats" class="panel">
+            <span style="color:#ff4444">❤️ <span id="hp-val">100</span></span>
+            <span style="color:#ffd700">💰 <span id="gold-val">1000</span></span>
+        </div>
+
+        <div id="build-menu" class="panel">
+            <h3 style="margin-top:0">🔨 CHANTIER</h3>
+            <button class="btn" onclick="requestBuild('mine', 50)">MINE (50G)</button>
+            <button class="btn" onclick="requestBuild('ferme', 50)">FERME (50G)</button>
+            <button class="btn" onclick="requestBuild('caserne', 150)">CASERNE (150G)</button>
+        </div>
+
+        <div id="nav">
+            <button class="btn" style="border-radius:50%; width:60px; height:60px" onclick="tp('farm')">🌳</button>
+            <button class="btn" style="border-radius:50%; width:60px; height:60px" onclick="tp('adventure')">⛏️</button>
+        </div>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -60,76 +63,78 @@
 import * as THREE from 'three';
 
 const socket = io();
-let scene, camera, renderer, player, stats, currentZone = 'farm';
+let scene, camera, renderer, player, stats, ground;
 const otherPlayers = {};
-const blocks = [];
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+const buildings = [];
 
-window.doLogin = () => {
+// --- TEXTURE GÉNÉRÉE ---
+function getGrassTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1a3c1a'; ctx.fillRect(0,0,512,512);
+    for(let i=0; i<20000; i++) {
+        ctx.fillStyle = `rgb(0, ${Math.random()*80 + 40}, 0)`;
+        ctx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(100, 100);
+    return tex;
+}
+
+window.connect = () => {
     const pseudo = document.getElementById('pseudo').value;
     const mdp = document.getElementById('mdp').value;
     if(pseudo && mdp) socket.emit('login', { pseudo, mdp });
 };
 
 socket.on('authSuccess', (data) => {
-    stats = data;
-    document.getElementById('login-screen').style.display = 'none';
-    initWorld();
+    stats = data.user;
+    document.getElementById('overlay').style.display = 'none';
+    init();
+    data.buildings.forEach(b => spawnBuilding(b));
 });
 
-function initWorld() {
+function init() {
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    scene.background = new THREE.Color(0x87CEEB);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const sun = new THREE.PointLight(0x00f2ff, 1.5, 100);
-    sun.position.set(5, 15, 5);
-    scene.add(sun);
+    const amb = new THREE.AmbientLight(0xffffff, 0.6);
+    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+    sun.position.set(50, 100, 50);
+    scene.add(amb, sun);
 
-    // Sol Grid Néon
-    const grid = new THREE.GridHelper(1000, 100, 0x00f2ff, 0x111111);
-    scene.add(grid);
+    // TERRAIN TEXTURÉ
+    const groundGeo = new THREE.PlaneGeometry(2000, 2000);
+    const groundMat = new THREE.MeshStandardMaterial({ map: getGrassTexture() });
+    ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI/2;
+    scene.add(ground);
 
-    // Joueur (Capsule Néon)
-    player = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.4, 0.8),
-        new THREE.MeshStandardMaterial({color: 0x00f2ff, emissive: 0x00f2ff, emissiveIntensity: 0.5})
-    );
-    player.position.y = 0.8;
+    // JOUEUR
+    player = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
+    player.position.y = 1;
     scene.add(player);
-
-    // Système de Minage (Clic)
-    window.addEventListener('mousedown', (e) => {
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const hit = raycaster.intersectObjects(blocks);
-        if(hit.length > 0) {
-            scene.remove(hit[0].object);
-            blocks.splice(blocks.indexOf(hit[0].object), 1);
-            stats.gold += 15; // Or gagné
-        }
-    });
 
     const keys = {};
     window.onkeydown = e => keys[e.code] = true;
     window.onkeyup = e => keys[e.code] = false;
 
-    // Game Loop
     function animate() {
         requestAnimationFrame(animate);
         if(stats.hp > 0) {
-            const speed = 0.18;
+            const speed = 0.2;
             if(keys['KeyW']) player.position.z -= speed;
             if(keys['KeyS']) player.position.z += speed;
             if(keys['KeyA']) player.position.x -= speed;
             if(keys['KeyD']) player.position.x += speed;
 
-            camera.position.lerp(new THREE.Vector3(player.position.x, 8, player.position.z + 12), 0.1);
+            camera.position.lerp(new THREE.Vector3(player.position.x, 10, player.position.z + 15), 0.1);
             camera.lookAt(player.position);
             socket.emit('move', player.position);
         }
@@ -137,62 +142,62 @@ function initWorld() {
     }
     animate();
 
-    // Boucle de survie (Faim/Vie)
+    // Survie
     setInterval(() => {
         if(stats.hp > 0) {
-            stats.food = Math.max(0, stats.food - 0.4);
-            if(stats.food <= 0) stats.hp = Math.max(0, stats.hp - 1.5);
-            
-            updateUI();
+            stats.hp -= 0.2; // Faim naturelle
+            if(stats.hp <= 0) document.getElementById('death-screen').style.display = 'flex';
+            document.getElementById('hp-val').innerText = Math.floor(stats.hp);
+            document.getElementById('gold-val').innerText = stats.gold;
             socket.emit('updateStats', stats);
-            
-            if(stats.hp <= 0) {
-                document.getElementById('death-screen').style.display = 'flex';
-            }
         }
     }, 1000);
 }
 
-function updateUI() {
-    document.getElementById('hp').innerText = Math.floor(stats.hp);
-    document.getElementById('food').innerText = Math.floor(stats.food);
-    document.getElementById('gold').innerText = stats.gold;
-}
-
-window.changeZone = (zone) => {
-    blocks.forEach(b => scene.remove(b));
-    blocks.length = 0;
-    if(zone === 'adventure') {
-        scene.background = new THREE.Color(0x050510);
-        for(let i=0; i<40; i++) {
-            const b = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.5,1.5), new THREE.MeshStandardMaterial({color:0x444444}));
-            b.position.set(Math.random()*80-40, 0.75, Math.random()*80-40);
-            scene.add(b);
-            blocks.push(b);
-        }
+// --- ACTIONS ---
+window.requestBuild = (type, cost) => {
+    if(stats.gold >= cost) {
+        socket.emit('build', { type, cost, x: player.position.x, z: player.position.z - 3 });
     } else {
-        scene.background = new THREE.Color(0x000000);
+        alert("Or insuffisant !");
     }
 };
 
-window.confirmRespawn = () => {
+socket.on('newBuilding', (b) => spawnBuilding(b));
+socket.on('updateGold', (g) => stats.gold = g);
+
+function spawnBuilding(b) {
+    let color = 0x8B4513; // Ferme
+    if(b.type === 'mine') color = 0x444444;
+    if(b.type === 'caserne') color = 0x111111;
+    
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), new THREE.MeshStandardMaterial({color}));
+    mesh.position.set(b.x, 1.5, b.z);
+    scene.add(mesh);
+}
+
+window.respawn = () => {
     socket.emit('requestRespawn');
 };
 
 socket.on('respawnDone', (u) => {
     stats = u;
-    player.position.set(0, 0.8, 0);
+    player.position.set(0, 1, 0);
     document.getElementById('death-screen').style.display = 'none';
-    updateUI();
 });
 
-socket.on('playerMoved', d => {
+socket.on('pMoved', d => {
     if(!otherPlayers[d.id]) {
-        otherPlayers[d.id] = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshBasicMaterial({color: 0xff00ff}));
+        otherPlayers[d.id] = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshBasicMaterial({color: 0xff00ff}));
         scene.add(otherPlayers[d.id]);
     }
     otherPlayers[d.id].position.copy(d.pos);
 });
+
+window.tp = (z) => {
+    if(z === 'adventure') scene.background = new THREE.Color(0x050510);
+    else scene.background = new THREE.Color(0x87CEEB);
+}
 </script>
 </body>
 </html>
