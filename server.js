@@ -6,43 +6,61 @@ const fs = require('fs');
 
 app.use(express.static(__dirname));
 
-// --- GESTION DE LA BASE DE DONNÉES ---
-let db = { users: {} };
+let db = { users: {}, globalHouses: [] }; // globalHouses pour le multi
 const DB_PATH = './database.json';
 
 if (fs.existsSync(DB_PATH)) {
-    try {
-        db = JSON.parse(fs.readFileSync(DB_PATH));
-        console.log("Données chargées avec succès.");
-    } catch (e) {
-        console.error("Erreur de lecture DB, reset en cours.");
-    }
+    try { db = JSON.parse(fs.readFileSync(DB_PATH)); } catch (e) { console.log("Erreur DB"); }
 }
 
-function saveDB() {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-}
+function save() { fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2)); }
+
+let players = {};
 
 io.on('connection', (socket) => {
     socket.on('login', (data) => {
         const pseudo = data.pseudo;
         if (!db.users[pseudo]) {
-            db.users[pseudo] = { 
-                pseudo, gold: 200, food: 100, hp: 100, oreStock: 0, houses: [] 
-            };
-            saveDB();
+            db.users[pseudo] = { pseudo, gold: 300, food: 100, oreStock: 0 };
         }
         socket.userId = pseudo;
-        socket.emit('authSuccess', { me: db.users[pseudo] });
+        players[socket.id] = { id: socket.id, pseudo, x: 0, z: 0 };
+        
+        // Envoyer l'état actuel au nouveau joueur
+        socket.emit('initData', { 
+            me: db.users[pseudo], 
+            houses: db.globalHouses,
+            players: players 
+        });
+        
+        socket.broadcast.emit('playerJoined', players[socket.id]);
     });
 
-    socket.on('saveAll', (data) => {
+    socket.on('move', (pos) => {
+        if(players[socket.id]) {
+            players[socket.id].x = pos.x;
+            players[socket.id].z = pos.z;
+            socket.broadcast.emit('playerMoved', players[socket.id]);
+        }
+    });
+
+    socket.on('newHouse', (houseData) => {
+        db.globalHouses.push(houseData);
+        io.emit('houseBuilt', houseData); // Tout le monde voit la maison
+        save();
+    });
+
+    socket.on('updatePlayer', (data) => {
         if(socket.userId) {
             db.users[socket.userId] = data;
-            saveDB();
+            save();
         }
+    });
+
+    socket.on('disconnect', () => {
+        io.emit('playerLeft', socket.id);
+        delete players[socket.id];
     });
 });
 
-const PORT = 3000;
-http.listen(PORT, () => console.log(`Serveur prêt sur http://localhost:${PORT}`));
+http.listen(3000, () => console.log("Nexus Dynasty X6 - Online"));
