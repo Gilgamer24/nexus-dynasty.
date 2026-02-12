@@ -11,9 +11,9 @@ io.on('connection', (socket) => {
     socket.on('login', (data) => {
         const { pseudo, mdp } = data;
         if (!db.users[pseudo]) {
-            // Initialisation stricte pour éviter les erreurs de calcul
             db.users[pseudo] = { 
-                pseudo, mdp, gold: 500, food: 100, hp: 100, workersCount: 0 
+                pseudo, mdp, gold: 0, food: 100, hp: 100, 
+                workersCount: 0, houses: [], tutoStep: 0 
             };
         }
         socket.userId = pseudo;
@@ -22,16 +22,16 @@ io.on('connection', (socket) => {
 
     socket.on('updateStats', (s) => {
         if(socket.userId && s) {
-            // Sécurité anti-bug : on vérifie que ce sont des nombres
             db.users[socket.userId].gold = Number(s.gold) || 0;
             db.users[socket.userId].food = Number(s.food) || 0;
             db.users[socket.userId].hp = Number(s.hp) || 0;
         }
     });
 
-    socket.on('move', (pos) => {
-        if(socket.userId) socket.broadcast.emit('pMoved', { id: socket.userId, pos });
+    socket.on('saveBuild', (houseData) => {
+        if(socket.userId) db.users[socket.userId].houses.push(houseData);
     });
 });
 
-http.listen(3000, () => console.log("Nexus Server v5: Economic Revolution"));
+const PORT = 3000;
+http.listen(PORT, () => console.log(`Serveur Nexus v6 tournant sur http://localhost:${PORT}`));
