@@ -18,7 +18,6 @@ io.on('connection', (socket) => {
         }
         socket.userId = pseudo;
         players[socket.id] = { id: socket.id, pseudo: pseudo, x: 0, z: 0 };
-        
         socket.emit('authSuccess', { me: db.users[pseudo], allPlayers: players });
         socket.broadcast.emit('playerJoined', players[socket.id]);
     });
@@ -41,4 +40,4 @@ io.on('connection', (socket) => {
     });
 });
 
-http.listen(3000, () => console.log("Nexus Multi-Engine Online"));
+http.listen(3000, () => console.log("Nexus Texture Engine Online"));
