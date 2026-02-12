@@ -1,18 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty - Multijoueur Total</title>
+    <title>Nexus Dynasty - Multi Stable</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
-        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #ff00ff; pointer-events: none; }
-        #status { font-weight: bold; }
+        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #00f2ff; pointer-events: none; }
     </style>
 </head>
 <body>
     <div id="ui">
         <b>NEXUS DYNASTY</b><br>
-        Statut : <span id="status">Connexion au serveur...</span><br>
-        Joueurs : <span id="pcount">0</span>
+        Statut : <span id="status">Connexion...</span><br>
+        Joueurs en ligne : <span id="pcount">0</span>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -41,10 +40,13 @@ const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(200, 200, 40, 40),
     new THREE.MeshStandardMaterial({ color: 0x7cfc00 })
 );
-const posArr = ground.geometry.attributes.position;
-for (let i = 0; i < posArr.count; i++) {
-    posArr.setZ(i, getHeight(posArr.getX(i), posArr.getY(i)));
-}
+ground.geometry.attributes.position.array.forEach((v, i) => {
+    if ((i + 1) % 3 === 0) {
+        const x = ground.geometry.attributes.position.array[i-2];
+        const z = ground.geometry.attributes.position.array[i-1];
+        ground.geometry.attributes.position.array[i] = getHeight(x, z);
+    }
+});
 ground.geometry.computeVertexNormals();
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
@@ -55,18 +57,21 @@ let myId = "";
 let yaw = 0;
 const keys = {};
 
-function createPlayerModel(color) {
+function createPlayerModel(id, isMe) {
     const group = new THREE.Group();
+    // On génère une couleur basée sur l'ID pour que chaque joueur soit différent
+    const color = isMe ? 0x00ffff : Math.floor(Math.random() * 0xffffff);
     const body = new THREE.Mesh(
         new THREE.CapsuleGeometry(0.5, 1, 4, 8), 
         new THREE.MeshStandardMaterial({ color: color })
     );
     body.position.y = 1;
     group.add(body);
-    // Un "visage" pour voir la direction
-    const face = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.2), new THREE.MeshStandardMaterial({color: 0x333333}));
-    face.position.set(0, 1.4, -0.4);
-    group.add(face);
+    
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.3), new THREE.MeshStandardMaterial({color: 0x000000}));
+    head.position.set(0, 1.4, -0.4);
+    group.add(head);
+    
     scene.add(group);
     return group;
 }
@@ -74,29 +79,21 @@ function createPlayerModel(color) {
 socket.on('connect', () => {
     myId = socket.id;
     document.getElementById('status').innerText = "EN LIGNE";
-    document.getElementById('status').style.color = "#00ff00";
+    if (!players[myId]) players[myId] = createPlayerModel(myId, true);
 });
 
-// Quand on reçoit la liste des joueurs
 socket.on('currentPlayers', (data) => {
     Object.keys(data).forEach(id => {
-        if (!players[id]) {
-            // Si c'est nous, on prend une couleur spéciale, sinon une couleur du serveur
-            const col = (id === myId) ? 0x00ffff : (data[id].color || Math.random() * 0xffffff);
-            players[id] = createPlayerModel(col);
-        }
+        if (!players[id]) players[id] = createPlayerModel(id, id === myId);
     });
     document.getElementById('pcount').innerText = Object.keys(data).length;
 });
 
-// Quand un nouveau joueur arrive
 socket.on('newPlayer', (data) => {
-    if (!players[data.id]) {
-        players[data.id] = createPlayerModel(data.color || 0xff00ff);
-    }
+    if (!players[data.id]) players[data.id] = createPlayerModel(data.id, false);
+    document.getElementById('pcount').innerText = Object.keys(players).length;
 });
 
-// Quand un joueur bouge
 socket.on('playerMoved', (data) => {
     if (players[data.id] && data.id !== myId) {
         players[data.id].position.set(data.x, data.y, data.z);
@@ -109,6 +106,7 @@ socket.on('playerDisconnected', (id) => {
         scene.remove(players[id]);
         delete players[id];
     }
+    document.getElementById('pcount').innerText = Object.keys(players).length;
 });
 
 // --- CONTROLES ---
@@ -144,12 +142,11 @@ function animate() {
 
         me.rotation.y = yaw;
 
-        // CAMERA 3rd PERSON
+        // CAMÉRA 3ÈME PERSONNE : Positionnée derrière toi
         const offset = new THREE.Vector3(0, 3, 6).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
         camera.position.copy(me.position).add(offset);
         camera.lookAt(me.position.x, me.position.y + 1, me.position.z);
 
-        // SYNC SERVEUR
         socket.emit('playerMovement', { x: me.position.x, y: me.position.y, z: me.position.z, ry: me.rotation.y });
     }
 
