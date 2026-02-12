@@ -7,7 +7,8 @@ app.use(express.static(__dirname));
 
 let db = { 
     users: {}, 
-    globalHouses: [] 
+    globalHouses: [],
+    market: [] // Liste des offres : { seller: 'Pseudo', price: 100, qty: 10 }
 };
 
 io.on('connection', (socket) => {
@@ -15,30 +16,27 @@ io.on('connection', (socket) => {
         const { pseudo } = data;
         if (!db.users[pseudo]) {
             db.users[pseudo] = { 
-                pseudo, gold: 0, food: 100, hp: 100, 
-                houses: [], status: "new" 
+                pseudo, gold: 50, food: 100, hp: 100, oreStock: 0 
             };
         }
         socket.userId = pseudo;
-        socket.emit('authSuccess', {
-            user: db.users[pseudo],
-            houses: db.globalHouses
-        });
+        socket.emit('authSuccess', { user: db.users[pseudo], houses: db.globalHouses, market: db.market });
     });
 
     socket.on('updateStats', (s) => {
-        if(socket.userId && s) {
-            db.users[socket.userId].gold = Number(s.gold) || 0;
-            db.users[socket.userId].food = Number(s.food) || 0;
-            db.users[socket.userId].hp = Number(s.hp) || 0;
-        }
+        if(socket.userId) db.users[socket.userId] = s;
     });
 
-    socket.on('buildGlobal', (houseData) => {
-        db.globalHouses.push(houseData);
-        socket.broadcast.emit('newHouse', houseData);
+    // Système de Shop entre joueurs
+    socket.on('postOffer', (offer) => {
+        db.market.push({ ...offer, id: Date.now() });
+        io.emit('marketUpdate', db.market);
+    });
+
+    socket.on('buildGlobal', (h) => {
+        db.globalHouses.push(h);
+        socket.broadcast.emit('newHouse', h);
     });
 });
 
-const PORT = 3000;
-http.listen(PORT, () => console.log(`Serveur Nexus Dynasty : http://localhost:${PORT}`));
+http.listen(3000, () => console.log("Nexus Economy Online"));
