@@ -5,50 +5,37 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
-// Simulation de base de données (À remplacer par MongoDB pour du long terme)
-let db = {
-    users: {}, // { pseudo: { mdp, gold, food, inv, plots } }
-    buildings: []
-};
+// Base de données temporaire (se vide au redémarrage du serveur)
+let db = { users: {} };
 
 io.on('connection', (socket) => {
-    // SYSTÈME DE COMPTE
     socket.on('login', (data) => {
         const { pseudo, mdp } = data;
         if (db.users[pseudo]) {
-            if (db.users[pseudo].mdp === mdp) {
-                socket.emit('authSuccess', db.users[pseudo]);
-            } else {
-                socket.emit('authError', "Mot de passe incorrect !");
-                return;
-            }
+            if (db.users[pseudo].mdp !== mdp) return socket.emit('authError', "Mauvais mot de passe !");
         } else {
-            // Création de compte
+            // Création automatique
             db.users[pseudo] = { 
-                pseudo, mdp, gold: 1000, food: 100, 
-                inv: [], plots: 1, zone: 'farm' 
+                pseudo, mdp, gold: 500, food: 100, hp: 100,
+                inv: [], zone: 'farm', pos: {x:0, y:0, z:0} 
             };
-            socket.emit('authSuccess', db.users[pseudo]);
         }
         socket.userId = pseudo;
+        socket.emit('authSuccess', db.users[pseudo]);
+        io.emit('updatePlayers', db.users);
     });
 
-    // TÉLÉPORTATION
-    socket.on('teleport', (zone) => {
-        if(socket.userId) {
-            db.users[socket.userId].zone = zone;
-            io.emit('playerMovedZone', { id: socket.id, zone: zone });
+    socket.on('move', (pos) => {
+        if(socket.userId && db.users[socket.userId]) {
+            db.users[socket.userId].pos = pos;
+            socket.broadcast.emit('pMoved', { id: socket.userId, pos });
         }
     });
 
-    // SYSTÈME DE DUEL (PVP)
-    socket.on('challenge', (targetId) => {
-        io.to(targetId).emit('duelRequest', { from: socket.id, bet: 500 });
-    });
-
-    socket.on('disconnect', () => {
-        delete db.users[socket.userId];
+    socket.on('teleport', (zone) => {
+        if(socket.userId) db.users[socket.userId].zone = zone;
     });
 });
 
-http.listen(3000, () => console.log("Nexus Dynastie v3.0 - Sécurisé"));
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => console.log(`Serveur prêt sur port ${PORT}`));
