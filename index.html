@@ -1,33 +1,40 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynastie : Ultra Texture</title>
+    <title>Nexus Dynasty : Evolution</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
-        #login-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: radial-gradient(circle, #111, #000); color: white; }
-        input { padding: 12px; margin: 5px; border-radius: 8px; border: 1px solid #00f2ff; background: #111; color: white; width: 260px; }
-        .btn { padding: 10px 25px; background: #00f2ff; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        #nav { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; }
-        .zone-btn { width: 60px; height: 60px; border-radius: 12px; border: 2px solid #00f2ff; background: rgba(0,0,0,0.6); color: white; font-size: 24px; cursor: pointer; transition: 0.3s; }
-        .zone-btn:hover { box-shadow: 0 0 15px #00f2ff; transform: scale(1.1); }
-        #stats { position: absolute; top: 20px; left: 20px; color: #00f2ff; font-size: 20px; font-weight: bold; text-shadow: 0 0 5px #000; }
+        #auth-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; background: radial-gradient(circle, #1a1a2e, #16213e); color: white; }
+        .ui-panel { position: absolute; background: rgba(0,0,0,0.8); border: 2px solid #00f2ff; border-radius: 12px; padding: 15px; color: white; pointer-events: auto; }
+        #nav { right: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; }
+        .btn-zone { width: 60px; height: 60px; cursor: pointer; border-radius: 50%; border: 2px solid #00f2ff; background: none; color: white; font-size: 24px; transition: 0.3s; }
+        .btn-zone:hover { box-shadow: 0 0 20px #00f2ff; transform: scale(1.1); background: #00f2ff; color: black; }
+        #hotbar { bottom: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+        .slot { width: 50px; height: 50px; background: rgba(255,255,255,0.1); border: 2px solid #444; border-radius: 5px; }
+        #stats { top: 20px; left: 20px; font-weight: bold; font-size: 20px; }
+        input { padding: 12px; margin: 5px; width: 250px; border-radius: 8px; border: 1px solid #00f2ff; background: #000; color: #fff; }
     </style>
 </head>
 <body>
 
-    <div id="login-screen">
-        <h1 style="color:#00f2ff; text-shadow: 0 0 10px #00f2ff;">NEXUS DYNASTIE</h1>
+    <div id="auth-screen">
+        <h1 style="color:#00f2ff; letter-spacing: 4px;">NEXUS DYNASTY</h1>
         <input type="text" id="pseudo" placeholder="Pseudo">
         <input type="password" id="mdp" placeholder="Mot de passe">
-        <button class="btn" onclick="connect()">SE CONNECTER</button>
+        <button onclick="connect()" style="margin-top:15px; padding: 10px 30px; cursor:pointer; font-weight:bold;">ENTRER DANS L'EMPIRE</button>
     </div>
 
-    <div id="stats">💰 <span id="gold">1000</span></div>
+    <div id="stats" class="ui-panel">💰 OR: <span id="gold">500</span> | 🍞 FAIM: <span id="food">100</span></div>
 
-    <div id="nav">
-        <button class="zone-btn" onclick="go('farm')">🌳</button>
-        <button class="zone-btn" onclick="go('adventure')">⛏️</button>
-        <button class="zone-btn" onclick="go('pvp')">⚔️</button>
+    <div id="nav" class="ui-panel">
+        <button class="btn-zone" onclick="tp('farm')">🌾</button>
+        <button class="btn-zone" onclick="tp('adventure')">⛏️</button>
+        <button class="btn-zone" onclick="tp('pvp')">⚔️</button>
+    </div>
+
+    <div id="hotbar" class="ui-panel">
+        <div class="slot" style="background: url('https://i.imgur.com/vH0M16S.png') center/cover;"></div>
+        <div class="slot"></div><div class="slot"></div><div class="slot"></div>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -37,35 +44,25 @@
 import * as THREE from 'three';
 
 const socket = io();
-let scene, camera, renderer, player, ground;
-const textures = {};
+let scene, camera, renderer, player, myData, ground;
+const remotePlayers = {};
 
-// --- GÉNÉRATEUR DE TEXTURES (SANS IMAGES EXTERNES) ---
-function generateTextures() {
+// --- TEXTURES GÉNÉRÉES ---
+function createTexture(type) {
     const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 256;
+    canvas.width = 128; canvas.height = 128;
     const ctx = canvas.getContext('2d');
-
-    // Texture Brique (pour aventure/pvp)
-    ctx.fillStyle = '#444'; ctx.fillRect(0,0,256,256);
-    ctx.strokeStyle = '#222'; ctx.lineWidth = 4;
-    for(let i=0; i<8; i++) {
-        for(let j=0; j<8; j++) {
-            ctx.strokeRect(i*32 + (j%2*16), j*32, 32, 32);
-        }
+    if(type === 'grass') {
+        ctx.fillStyle = '#2d5a27'; ctx.fillRect(0,0,128,128);
+        for(let i=0; i<100; i++) { ctx.fillStyle='#3d7a37'; ctx.fillRect(Math.random()*128, Math.random()*128, 4, 4); }
+    } else {
+        ctx.fillStyle = '#444'; ctx.fillRect(0,0,128,128);
+        ctx.strokeStyle = '#222'; ctx.strokeRect(0,0,128,128);
     }
-    textures.brick = new THREE.CanvasTexture(canvas.cloneNode(true));
-    textures.brick.wrapS = textures.brick.wrapT = THREE.RepeatWrapping;
-    textures.brick.repeat.set(1, 1);
-
-    // Texture Herbe (pour farm)
-    ctx.fillStyle = '#1a3c1a'; ctx.fillRect(0,0,256,256);
-    for(let i=0; i<500; i++) {
-        ctx.fillStyle = `rgb(0, ${Math.random()*100 + 50}, 0)`;
-        ctx.fillRect(Math.random()*256, Math.random()*256, 2, 2);
-    }
-    textures.grass = new THREE.CanvasTexture(canvas);
-    textures.grass.wrapS = textures.grass.wrapT = THREE.RepeatWrapping;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(50, 50);
+    return tex;
 }
 
 window.connect = () => {
@@ -75,8 +72,8 @@ window.connect = () => {
 };
 
 socket.on('authSuccess', (data) => {
-    document.getElementById('login-screen').style.display = 'none';
-    generateTextures();
+    myData = data;
+    document.getElementById('auth-screen').style.display = 'none';
     init();
 });
 
@@ -88,26 +85,20 @@ function init() {
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    // Lumières
-    const amb = new THREE.AmbientLight(0xffffff, 0.4);
-    const sun = new THREE.DirectionalLight(0xffffff, 1);
-    sun.position.set(10, 20, 10);
-    sun.castShadow = true;
-    scene.add(amb, sun);
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(10, 20, 10);
+    light.castShadow = true;
+    scene.add(light, new THREE.AmbientLight(0xffffff, 0.4));
 
-    // Sol avec texture
-    const groundGeo = new THREE.PlaneGeometry(1000, 1000);
-    const groundMat = new THREE.MeshStandardMaterial({ map: textures.grass });
-    ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI/2;
-    ground.receiveShadow = true;
+    // Sol évolutif
+    ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({map: createTexture('grass')}));
+    ground.rotation.x = -Math.PI/2; ground.receiveShadow = true;
     scene.add(ground);
 
-    // Joueur stylé
+    // Joueur HD
     player = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({ color: 0x00f2ff, emissive: 0x00f2ff, emissiveIntensity: 0.2 }));
-    body.position.y = 0.8;
-    body.castShadow = true;
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
+    body.position.y = 0.8; body.castShadow = true;
     player.add(body);
     scene.add(player);
 
@@ -115,36 +106,44 @@ function init() {
     window.onkeydown = e => keys[e.code] = true;
     window.onkeyup = e => keys[e.code] = false;
 
-    window.go = (zone) => {
+    window.tp = (zone) => {
+        socket.emit('teleport', zone);
         if(zone === 'adventure') {
-            ground.material.map = textures.brick;
-            ground.material.color.set(0x555555);
-            // Rajouter des murs
-            for(let i=0; i<10; i++) {
-                const wall = new THREE.Mesh(new THREE.BoxGeometry(2,4,2), new THREE.MeshStandardMaterial({map: textures.brick}));
-                wall.position.set(Math.random()*40-20, 2, Math.random()*40-20);
-                scene.add(wall);
+            ground.material.map = createTexture('stone');
+            scene.background = new THREE.Color(0x050510);
+            // Spawn cubes
+            for(let i=0; i<20; i++) {
+                const b = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshStandardMaterial({color: 0x777}));
+                b.position.set(Math.random()*40-20, 0.5, Math.random()*40-20);
+                scene.add(b);
             }
         } else {
-            ground.material.map = textures.grass;
-            ground.material.color.set(0xffffff);
+            ground.material.map = createTexture('grass');
+            scene.background = new THREE.Color(0x87CEEB);
         }
     };
 
     function animate() {
         requestAnimationFrame(animate);
-        const speed = 0.15;
-        if(keys['KeyW']) player.position.z -= speed;
-        if(keys['KeyS']) player.position.z += speed;
-        if(keys['KeyA']) player.position.x -= speed;
-        if(keys['KeyD']) player.position.x += speed;
-
-        camera.position.lerp(new THREE.Vector3(player.position.x, 8, player.position.z + 12), 0.1);
+        const s = 0.15;
+        if(keys['KeyW']) player.position.z -= s; if(keys['KeyS']) player.position.z += s;
+        if(keys['KeyA']) player.position.x -= s; if(keys['KeyD']) player.position.x += s;
+        
+        camera.position.lerp(new THREE.Vector3(player.position.x, 7, player.position.z + 12), 0.1);
         camera.lookAt(player.position);
+        socket.emit('move', player.position);
         renderer.render(scene, camera);
     }
     animate();
 }
+
+socket.on('pMoved', d => {
+    if(!remotePlayers[d.id]) {
+        remotePlayers[d.id] = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshBasicMaterial({color: 0xff00ff}));
+        scene.add(remotePlayers[d.id]);
+    }
+    remotePlayers[d.id].position.copy(d.pos);
+});
 </script>
 </body>
 </html>
