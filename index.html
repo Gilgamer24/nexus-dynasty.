@@ -2,36 +2,33 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Nexus Dynasty - Tutorial Edition</title>
+    <title>Nexus Dynasty - Deluxe Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .ui { position: absolute; inset: 0; pointer-events: none; }
-        .panel { position: absolute; background: rgba(0, 0, 0, 0.85); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; color: white; pointer-events: auto; }
-        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; }
+        .panel { position: absolute; background: rgba(0, 0, 0, 0.85); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; color: white; pointer-events: auto; box-shadow: 0 0 15px rgba(0, 242, 255, 0.2); }
+        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; font-size: 1.1em; }
         #menu { bottom: 20px; left: 20px; width: 280px; }
-        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; }
+        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background: #00f2ff; color: black; }
         #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 12px; margin: 10px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; }
-        
-        /* TUTORIEL */
+        input { padding: 12px; margin: 10px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; border-radius: 5px; }
         #tuto-box { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); width: 400px; text-align: center; z-index: 5000; display: none; }
-        .tuto-step { color: #00f2ff; font-size: 1.2em; margin-bottom: 15px; text-shadow: 2px 2px #000; }
-        
-        #trade-msg { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); color: gold; font-weight: bold; display: none; text-shadow: 2px 2px #000; font-size: 20px; }
+        #trade-msg { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); color: #ffd700; font-weight: bold; display: none; text-shadow: 2px 2px #000; font-size: 22px; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="color:#00f2ff; letter-spacing: 5px;">NEXUS DYNASTY</h1>
+        <h1 style="color:#00f2ff; letter-spacing: 5px; text-shadow: 0 0 10px #00f2ff;">NEXUS DYNASTY</h1>
         <input type="text" id="pseudo" placeholder="NOM DU JOUEUR">
-        <button class="btn" style="width: 200px;" onclick="connect()">COMMENCER</button>
+        <button class="btn" style="width: 200px;" onclick="connect()">REJOINDRE</button>
     </div>
 
     <div id="tuto-box" class="panel">
-        <h3>📜 TUTORIEL</h3>
-        <div id="tuto-text" class="tuto-step">Bienvenue ! Utilise Z, Q, S, D pour te déplacer.</div>
-        <button class="btn" id="tuto-next" onclick="nextStep()">OK !</button>
+        <h3 style="margin-top:0">📜 CONSEILS DU ROI</h3>
+        <div id="tuto-text" style="color: #00f2ff; font-size: 1.1em; margin-bottom: 15px;">Utilise Z, Q, S, D pour marcher dans le royaume.</div>
+        <button class="btn" onclick="nextStep()">SUIVANT</button>
     </div>
 
     <div id="trade-msg">APPUIE SUR [E] POUR VENDRE</div>
@@ -41,12 +38,12 @@
             <span>❤️ <span id="hp">100</span></span>
             <span style="color:#4dff4d">🍞 <span id="food">100</span></span>
             <span style="color:#ffd700">💰 <span id="gold">0</span></span>
-            <span style="color:#00f2ff">📦 STOCK: <span id="ore">0</span></span>
+            <span style="color:#00f2ff">📦 <span id="ore">0</span></span>
         </div>
         <div id="menu" class="panel">
-            <button class="btn" onclick="buildHouse()">🏠 MAISON (100G)</button>
-            <button class="btn" onclick="addWorker()">🤖 MINEUR AUTO (150G)</button>
-            <button class="btn" onclick="buyFood()">🍞 NOURRITURE (30G)</button>
+            <button class="btn" onclick="buildHouse()">🏠 POSER MAISON (100G)</button>
+            <button class="btn" onclick="addWorker()">🤖 RECRUTER MINEUR (150G)</button>
+            <button class="btn" onclick="buyFood()">🍞 ACHETER VIVRES (30G)</button>
         </div>
     </div>
 
@@ -63,24 +60,48 @@ const ores = [], workers = [], houses = [], remotePlayers = {};
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-// --- TEXTURES ---
+// --- GÉNÉRATEUR DE TEXTURES ---
 function createTex(c1, c2, isGrass=false) {
     const canvas = document.createElement('canvas');
-    canvas.width = 64; canvas.height = 64;
+    canvas.width = 128; canvas.height = 128;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = c1; ctx.fillRect(0,0,64,64);
+    ctx.fillStyle = c1; ctx.fillRect(0,0,128,128);
     ctx.fillStyle = c2;
-    for(let i=0; i<40; i++) ctx.fillRect(Math.random()*64, Math.random()*64, 4, 4);
+    for(let i=0; i<100; i++) ctx.fillRect(Math.random()*128, Math.random()*128, 4, 4);
     const tex = new THREE.CanvasTexture(canvas);
     if(isGrass) { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(100, 100); }
     return tex;
 }
 
 const textures = {
-    grass: createTex('#2d8a2d', '#1e5e1e', true),
-    stone: createTex('#444', '#666'),
+    grass: createTex('#348C31', '#2D7A29', true),
+    stone: createTex('#555555', '#777777'),
     wood: createTex('#5d3a1a', '#3d2610')
 };
+
+// --- CRÉATION DE PERSONNAGES STYLÉS ---
+function createCharacter(color, hasHat = false) {
+    const group = new THREE.Group();
+    // Corps
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color}));
+    body.position.y = 0.6;
+    group.add(body);
+    // Yeux
+    const eyeGeo = new THREE.SphereGeometry(0.06);
+    const eyeMat = new THREE.MeshBasicMaterial({color: 0x000000});
+    const e1 = new THREE.Mesh(eyeGeo, eyeMat); e1.position.set(0.15, 0.9, 0.3);
+    const e2 = new THREE.Mesh(eyeGeo, eyeMat); e2.position.set(-0.15, 0.9, 0.3);
+    group.add(e1, e2);
+    // Chapeau (Marchand / Mineurs)
+    if(hasHat) {
+        const hatBase = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.1), new THREE.MeshStandardMaterial({color: 0x222222}));
+        hatBase.position.y = 1.05;
+        const hatTop = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.4), new THREE.MeshStandardMaterial({color: 0x222222}));
+        hatTop.position.y = 1.25;
+        group.add(hatBase, hatTop);
+    }
+    return group;
+}
 
 window.connect = () => {
     const p = document.getElementById('pseudo').value;
@@ -95,13 +116,12 @@ socket.on('authSuccess', (data) => {
     Object.values(data.allPlayers).forEach(p => { if(p.id !== socket.id) createRemotePlayer(p); });
 });
 
-// LOGIQUE DU TUTORIEL
 window.nextStep = () => {
     tutoStep++;
     const txt = document.getElementById('tuto-text');
-    if(tutoStep === 1) txt.innerHTML = "Trouve les cailloux gris. Rapproche-toi d'eux au maximum et clique dessus pour miner !";
-    else if(tutoStep === 2) txt.innerHTML = "Va voir le marchand (bloc violet) et appuie sur [E] pour transformer tes minerais en Or.";
-    else if(tutoStep === 3) txt.innerHTML = "Utilise ton Or dans le menu en bas à gauche pour bâtir ton empire. Bonne chance !";
+    if(tutoStep === 1) txt.innerHTML = "Colle-toi aux rochers gris et clique dessus pour les briser et récolter de la pierre.";
+    else if(tutoStep === 2) txt.innerHTML = "Le marchand (violet avec le chapeau) t'attend pour échanger tes pierres contre de l'Or (Touche [E]).";
+    else if(tutoStep === 3) txt.innerHTML = "Bâtis des maisons pour stocker ta production et recrute des mineurs pour automatiser le travail !";
     else document.getElementById('tuto-box').style.display = 'none';
 };
 
@@ -112,44 +132,47 @@ function initGame() {
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
-    scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-    // SOL
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.6);
+    sun.position.set(20, 50, 20);
+    scene.add(sun);
+
+    // SOL HERBE
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({map: textures.grass}));
     ground.rotation.x = -Math.PI/2;
     scene.add(ground);
 
     // JOUEUR
-    player = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
-    player.position.y = 1;
+    player = createCharacter(0x00f2ff);
     scene.add(player);
 
     // MARCHAND
-    merchant = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), new THREE.MeshStandardMaterial({color: 0x9932cc}));
-    merchant.position.set(20, 1.5, 20);
+    merchant = createCharacter(0x9932cc, true);
+    merchant.position.set(15, 0, 15);
     scene.add(merchant);
 
-    // MINERAIS
-    const oreGeo = new THREE.DodecahedronGeometry(0.8);
+    // ROCHERS (OBJETS À MINER)
+    const oreGeo = new THREE.DodecahedronGeometry(0.75);
     for(let i=0; i<60; i++) {
         const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({map: textures.stone}));
-        ore.position.set(Math.random()*300-150, 0.5, Math.random()*300-150);
+        ore.position.set(Math.random()*300-150, 0.4, Math.random()*300-150);
         scene.add(ore);
         ores.push(ore);
     }
 
-    // MINAGE (DOIT ÊTRE COLLÉ)
+    // MINAGE PAR CLIC + CONTACT
     window.addEventListener('mousedown', (e) => {
-        if(!player) return;
         mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
         const hits = raycaster.intersectObjects(ores);
         if(hits.length > 0) {
-            const dist = player.position.distanceTo(hits[0].object.position);
-            if(dist < 5) { // SYSTÈME "COLLÉ" : Distance courte
-                myStats.oreStock += 5;
-                hits[0].object.position.set(Math.random()*300-150, 0.5, Math.random()*300-150);
+            const obj = hits[0].object;
+            // Rayon de 4 unités pour être "collé"
+            if(player.position.distanceTo(obj.position) < 4) {
+                myStats.oreStock += 10;
+                obj.position.set(Math.random()*300-150, 0.4, Math.random()*300-150);
                 socket.emit('saveAll', myStats);
             }
         }
@@ -157,24 +180,24 @@ function initGame() {
 
     // MULTIJOUEUR
     socket.on('playerJoined', createRemotePlayer);
-    socket.on('playerMoved', (d) => { if(remotePlayers[d.id]) remotePlayers[d.id].position.set(d.x, 1, d.z); });
-    socket.on('playerLeft', (id) => { scene.remove(remotePlayers[id]); delete remotePlayers[id]; });
+    socket.on('playerMoved', (d) => { if(remotePlayers[d.id]) remotePlayers[d.id].position.set(d.x, 0, d.z); });
+    socket.on('playerLeft', (id) => { if(remotePlayers[id]) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; }});
 
     myStats.houses.forEach(pos => spawnHouseMesh(pos));
     animate();
 }
 
 function createRemotePlayer(d) {
-    const p = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color: 0xff4444}));
-    p.position.set(d.x, 1, d.z);
+    const p = createCharacter(0xff4444);
+    p.position.set(d.x, 0, d.z);
     scene.add(p);
     remotePlayers[d.id] = p;
 }
 
 const keys = {};
-window.onkeydown = e => {
-    keys[e.code] = true;
-    if(e.code === 'KeyE' && player.position.distanceTo(merchant.position) < 6) {
+window.onkeydown = e => { 
+    keys[e.code] = true; 
+    if(e.code === 'KeyE' && player.position.distanceTo(merchant.position) < 5) {
         if(myStats.oreStock > 0) {
             myStats.gold += myStats.oreStock * 12;
             myStats.oreStock = 0;
@@ -188,6 +211,7 @@ function animate() {
     requestAnimationFrame(animate);
     if(!player) return;
 
+    // Déplacements ZQSD
     if(keys['KeyW']) player.position.z -= 0.25;
     if(keys['KeyS']) player.position.z += 0.25;
     if(keys['KeyA']) player.position.x -= 0.25;
@@ -195,38 +219,57 @@ function animate() {
 
     if(keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']) {
         socket.emit('move', {x: player.position.x, z: player.position.z});
+        // Rotation pour regarder vers la direction
+        player.lookAt(player.position.x + (keys['KeyD']?1:keys['KeyA']?-1:0), 0, player.position.z + (keys['KeyS']?1:keys['KeyW']?-1:0));
     }
 
+    // IA MINEURS (PLUS RAPIDE & CASSAGE DE PIERRE)
     workers.forEach(w => {
         const target = w.carrying ? w.home.mesh : w.target;
-        if(w.mesh.position.distanceTo(target.position) > 2) {
+        const dist = w.mesh.position.distanceTo(target.position);
+        
+        if(dist > 1.8) {
             const dir = new THREE.Vector3().subVectors(target.position, w.mesh.position).normalize();
-            w.mesh.position.add(dir.multiplyScalar(0.18));
+            w.mesh.position.add(dir.multiplyScalar(0.2));
+            w.mesh.lookAt(target.position.x, 0, target.position.z);
         } else {
-            if(!w.carrying) w.carrying = true;
-            else { w.home.stored += 2; w.carrying = false; w.target = ores[Math.floor(Math.random()*ores.length)]; }
+            if(!w.carrying) {
+                // IL CASSE LA PIERRE
+                w.target.position.set(Math.random()*300-150, 0.4, Math.random()*300-150);
+                w.carrying = true;
+            } else {
+                // IL DÉPOSE À LA MAISON
+                w.home.stored += 5;
+                w.carrying = false;
+                w.target = ores[Math.floor(Math.random()*ores.length)];
+            }
         }
     });
 
+    // COLLECTE AUTOMATIQUE AUX MAISONS
     houses.forEach(h => {
-        if(player.position.distanceTo(h.mesh.position) < 4) {
-            myStats.oreStock += h.stored; h.stored = 0;
+        if(player.position.distanceTo(h.mesh.position) < 4.5) {
+            myStats.oreStock += h.stored;
+            h.stored = 0;
         }
     });
 
-    document.getElementById('trade-msg').style.display = player.position.distanceTo(merchant.position) < 6 ? 'block' : 'none';
-    camera.position.lerp(new THREE.Vector3(player.position.x, 30, player.position.z + 30), 0.1);
+    document.getElementById('trade-msg').style.display = player.position.distanceTo(merchant.position) < 5 ? 'block' : 'none';
+    
+    // CAMÉRA LISSÉE
+    camera.position.lerp(new THREE.Vector3(player.position.x, 25, player.position.z + 20), 0.1);
     camera.lookAt(player.position);
+    
     renderer.render(scene, camera);
     updateUI();
 }
 
 function spawnHouseMesh(pos) {
     const group = new THREE.Group();
-    const b = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), new THREE.MeshStandardMaterial({map: textures.wood}));
-    const r = new THREE.Mesh(new THREE.ConeGeometry(3.5, 2, 4), new THREE.MeshStandardMaterial({color: 0x9d2323}));
-    r.position.y = 2.5; r.rotation.y = Math.PI/4;
-    group.add(b, r);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), new THREE.MeshStandardMaterial({map: textures.wood}));
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 2, 4), new THREE.MeshStandardMaterial({color: 0x9d2323}));
+    roof.position.y = 2.5; roof.rotation.y = Math.PI/4;
+    group.add(base, roof);
     group.position.set(pos.x, 1.5, pos.z);
     scene.add(group);
     houses.push({ mesh: group, stored: 0 });
@@ -245,7 +288,7 @@ window.buildHouse = () => {
 window.addWorker = () => {
     if(myStats.gold >= 150 && houses.length > 0) {
         myStats.gold -= 150;
-        const m = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshStandardMaterial({color: 0xffff00}));
+        const m = createCharacter(0xffd700, true); // Mineur Jaune Or
         m.position.copy(player.position);
         scene.add(m);
         workers.push({ mesh: m, carrying: false, target: ores[0], home: houses[houses.length-1] });
@@ -267,10 +310,11 @@ function updateUI() {
     document.getElementById('ore').innerText = Math.floor(myStats.oreStock);
 }
 
+// SURVIE
 setInterval(() => {
     if(myStats && myStats.hp > 0) {
-        myStats.food -= 0.5;
-        if(myStats.food <= 0) myStats.hp -= 2;
+        myStats.food -= 0.4;
+        if(myStats.food <= 0) { myStats.food = 0; myStats.hp -= 2; }
         socket.emit('saveAll', myStats);
     }
 }, 1000);
