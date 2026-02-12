@@ -1,18 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty - Fix Final</title>
+    <title>Nexus Dynasty - Fix Caméra</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
-        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #00f2ff; pointer-events: none; }
-        #score { color: #00f2ff; font-weight: bold; font-size: 20px; }
+        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; pointer-events: none; border-left: 5px solid #00f2ff; }
     </style>
 </head>
 <body>
     <div id="ui">
         <b>NEXUS DYNASTY</b><br>
-        Fragments: <span id="score">0</span><br>
-        <small>Z,Q,S,D pour bouger | ESPACE pour sauter</small>
+        Statut: <span id="status">Connexion...</span><br>
+        Joueurs: <span id="pcount">1</span>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -31,51 +30,73 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+// --- LUMIÈRES ---
 scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 const sun = new THREE.DirectionalLight(0xffffff, 0.8);
 sun.position.set(10, 20, 10);
 scene.add(sun);
 
-// --- TERRAIN ---
+// --- TERRAIN & ARBRES ---
 function getHeight(x, z) { return Math.sin(x * 0.05) * 2 + Math.cos(z * 0.05) * 2; }
-const groundGeo = new THREE.PlaneGeometry(200, 200, 40, 40);
-const posArr = groundGeo.attributes.position;
+const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200, 50, 50),
+    new THREE.MeshStandardMaterial({ color: 0x567d46 })
+);
+const posArr = ground.geometry.attributes.position;
 for (let i = 0; i < posArr.count; i++) {
     posArr.setZ(i, getHeight(posArr.getX(i), posArr.getY(i)));
 }
-groundGeo.computeVertexNormals();
-const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ color: 0x567d46 }));
+ground.geometry.computeVertexNormals();
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// --- JOUEURS ---
+// Ajout de quelques arbres pour le relief visuel
+for(let i=0; i<30; i++) {
+    const x = Math.sin(i*123)*60; const z = Math.cos(i*123)*60;
+    const tree = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 2), new THREE.MeshStandardMaterial({color: 0x5D4037}));
+    const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.5, 3), new THREE.MeshStandardMaterial({color: 0x2E8B57}));
+    leaves.position.y = 2; trunk.position.y = 1;
+    tree.add(trunk, leaves);
+    tree.position.set(x, getHeight(x, z), z);
+    scene.add(tree);
+}
+
+// --- LOGIQUE JOUEURS ---
 const players = {}; 
 let myId = "";
-let yaw = 0, pitch = 0;
+let yaw = 0;
 const keys = {};
 
-function createModel(color = 0x00ff00) {
+function createModel(color) {
     const group = new THREE.Group();
-    // Corps
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4, 8), new THREE.MeshStandardMaterial({color: color}));
     body.position.y = 1;
     group.add(body);
-    // Viseur (pour voir la direction)
-    const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.2), new THREE.MeshStandardMaterial({color: 0x000000}));
-    eyes.position.set(0, 1.3, -0.4);
-    group.add(eyes);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.2), new THREE.MeshStandardMaterial({color: 0x000000}));
+    head.position.set(0, 1.4, -0.4); // Indique l'avant
+    group.add(head);
     return group;
 }
 
-socket.on('connect', () => { myId = socket.id; });
+socket.on('connect', () => {
+    myId = socket.id;
+    document.getElementById('status').innerText = "En ligne";
+    // On crée notre propre perso immédiatement
+    if (!players[myId]) {
+        players[myId] = createModel(0x00ffcc);
+        scene.add(players[myId]);
+    }
+});
 
 socket.on('currentPlayers', (data) => {
     Object.keys(data).forEach(id => {
         if (!players[id]) {
-            players[id] = createModel(id === myId ? 0x00ff00 : 0xff4444);
+            players[id] = createModel(id === myId ? 0x00ffcc : 0xff4477);
             scene.add(players[id]);
         }
     });
+    document.getElementById('pcount').innerText = Object.keys(data).length;
 });
 
 socket.on('playerMoved', (data) => {
@@ -92,11 +113,7 @@ socket.on('playerDisconnected', (id) => {
 // --- CONTROLES ---
 document.body.onclick = () => document.body.requestPointerLock();
 document.onmousemove = e => {
-    if (document.pointerLockElement === document.body) {
-        yaw -= e.movementX * 0.003;
-        pitch -= e.movementY * 0.003;
-        pitch = Math.max(-0.6, Math.min(0.4, pitch)); // Limite l'angle haut/bas
-    }
+    if (document.pointerLockElement === document.body) yaw -= e.movementX * 0.003;
 };
 window.onkeydown = e => keys[e.code] = true;
 window.onkeyup = e => keys[e.code] = false;
@@ -107,8 +124,6 @@ function animate() {
 
     if (myId && players[myId]) {
         const me = players[myId];
-        
-        // Mouvement relatif à la caméra
         const move = new THREE.Vector3();
         if (keys['KeyW']) move.z -= 1;
         if (keys['KeyS']) move.z += 1;
@@ -120,27 +135,21 @@ function animate() {
             me.position.add(move);
         }
         
-        // Gravité et Saut
-        vY -= 0.02;
-        me.position.y += vY;
+        // Physique simple
+        vY -= 0.02; me.position.y += vY;
         const h = getHeight(me.position.x, me.position.z);
-        if (me.position.y < h) { 
-            me.position.y = h; 
-            vY = 0; 
-        }
+        if (me.position.y < h) { me.position.y = h; vY = 0; }
         if (keys['Space'] && me.position.y <= h + 0.1) vY = 0.4;
 
         me.rotation.y = yaw;
 
-        // --- CAMERA 3EME PERSONNE ---
-        const camDist = 6;  // Distance derrière le joueur
-        const camHeight = 3; // Hauteur de la caméra
-        const offset = new THREE.Vector3(0, camHeight, camDist).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        
-        camera.position.copy(me.position).add(offset);
+        // --- CAMÉRA 3ÈME PERSONNE ---
+        // On place la caméra à 5 unités derrière et 3 unités au dessus du joueur
+        const relativeCameraOffset = new THREE.Vector3(0, 3, 5);
+        const cameraOffset = relativeCameraOffset.applyMatrix4(me.matrixWorld);
+        camera.position.lerp(cameraOffset, 0.1); // Suivi fluide
         camera.lookAt(me.position.x, me.position.y + 1, me.position.z);
 
-        // Envoi au serveur
         socket.emit('playerMovement', { x: me.position.x, y: me.position.y, z: me.position.z, ry: me.rotation.y });
     }
 
