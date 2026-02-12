@@ -1,17 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty - Debug Multi</title>
+    <title>Nexus Dynasty - Final Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
-        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.8); color: white; padding: 15px; border-radius: 8px; pointer-events: none; border-left: 5px solid #00ff00; }
+        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; pointer-events: none; border-left: 5px solid #00f2ff; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <b>DEBUG MULTIJOUEUR</b><br>
-        Mon ID : <span id="myid">...</span><br>
-        Joueurs détectés : <span id="pcount">0</span>
+        <b>NEXUS DYNASTY</b><br>
+        Joueurs : <span id="pcount">0</span>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -29,36 +28,49 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xffffff, 1));
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-// Sol simple
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(100,100), new THREE.MeshStandardMaterial({color: 0x7cfc00}));
+// --- TERRAIN ---
+function getHeight(x, z) { return Math.sin(x * 0.05) * 2 + Math.cos(z * 0.05) * 2; }
+const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200, 40, 40),
+    new THREE.MeshStandardMaterial({ color: 0x7cfc00 })
+);
+const posArr = ground.geometry.attributes.position;
+for (let i = 0; i < posArr.count; i++) {
+    const x = posArr.getX(i);
+    const z = posArr.getY(i);
+    posArr.setZ(i, getHeight(x, z));
+}
+ground.geometry.computeVertexNormals();
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
+// --- JOUEURS ---
 const players = {}; 
 let myId = "";
+let yaw = 0;
+const keys = {};
 
-function createBox(id, color) {
-    console.log("Création visuelle pour : " + id);
-    const mesh = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.5, 1, 4, 8), 
-        new THREE.MeshStandardMaterial({ color: color })
-    );
-    mesh.position.y = 1;
-    scene.add(mesh);
-    return mesh;
+function createPlayerMesh(id, color) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4, 8), new THREE.MeshStandardMaterial({color: color}));
+    body.position.y = 1;
+    group.add(body);
+    // Un "nez" pour voir la direction
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.4), new THREE.MeshStandardMaterial({color: 0x000000}));
+    nose.position.set(0, 1.4, -0.4);
+    group.add(nose);
+    scene.add(group);
+    return group;
 }
 
-socket.on('connect', () => {
-    myId = socket.id;
-    document.getElementById('myid').innerText = myId;
-});
+socket.on('connect', () => { myId = socket.id; });
 
 socket.on('currentPlayers', (data) => {
     Object.keys(data).forEach(id => {
         if (!players[id]) {
-            players[id] = createBox(id, id === myId ? 0x00ffff : 0xff0000);
+            players[id] = createPlayerMesh(id, data[id].color);
         }
     });
     document.getElementById('pcount').innerText = Object.keys(data).length;
@@ -66,48 +78,58 @@ socket.on('currentPlayers', (data) => {
 
 socket.on('newPlayer', (data) => {
     if (!players[data.id]) {
-        players[data.id] = createBox(data.id, 0xff0000);
+        players[data.id] = createPlayerMesh(data.id, data.color);
     }
     document.getElementById('pcount').innerText = Object.keys(players).length;
 });
 
 socket.on('playerMoved', (data) => {
-    if (players[data.id]) {
+    if (players[data.id] && data.id !== myId) {
         players[data.id].position.set(data.x, data.y, data.z);
         players[data.id].rotation.y = data.ry;
     }
 });
 
 socket.on('playerDisconnected', (id) => {
-    if (players[id]) {
-        scene.remove(players[id]);
-        delete players[id];
-    }
+    if (players[id]) { scene.remove(players[id]); delete players[id]; }
     document.getElementById('pcount').innerText = Object.keys(players).length;
 });
 
-// Contrôles
-const keys = {};
-let yaw = 0;
+// --- CONTROLES ---
 document.body.onclick = () => document.body.requestPointerLock();
-document.onkeydown = e => keys[e.code] = true;
-document.onkeyup = e => keys[e.code] = false;
-document.onmousemove = e => { if(document.pointerLockElement) yaw -= e.movementX * 0.003; };
+document.onmousemove = (e) => { if (document.pointerLockElement) yaw -= e.movementX * 0.003; };
+window.onkeydown = (e) => keys[e.code] = true;
+window.onkeyup = (e) => keys[e.code] = false;
 
+let vY = 0;
 function animate() {
     requestAnimationFrame(animate);
+
     if (myId && players[myId]) {
         const me = players[myId];
-        if (keys['KeyW']) me.translateZ(-0.2);
-        if (keys['KeyS']) me.translateZ(0.2);
-        if (keys['KeyA']) me.translateX(-0.2);
-        if (keys['KeyD']) me.translateX(0.2);
+        const move = new THREE.Vector3();
+        if (keys['KeyW']) move.z -= 1;
+        if (keys['KeyS']) move.z += 1;
+        if (keys['KeyA']) move.x -= 1;
+        if (keys['KeyD']) move.x += 1;
+
+        if (move.length() > 0) {
+            move.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).normalize().multiplyScalar(0.2);
+            me.position.add(move);
+        }
+        
+        // Physique
+        vY -= 0.02; me.position.y += vY;
+        const h = getHeight(me.position.x, me.position.z);
+        if (me.position.y < h) { me.position.y = h; vY = 0; }
+        if (keys['Space'] && me.position.y <= h + 0.1) vY = 0.4;
+
         me.rotation.y = yaw;
 
-        // CAMERA TPS
-        const offset = new THREE.Vector3(0, 3, 5).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        camera.position.copy(me.position).add(offset);
-        camera.lookAt(me.position);
+        // CAMERA 3rd PERSON
+        const camOffset = new THREE.Vector3(0, 3, 5).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+        camera.position.copy(me.position).add(camOffset);
+        camera.lookAt(me.position.x, me.position.y + 1, me.position.z);
 
         socket.emit('playerMovement', { x: me.position.x, y: me.position.y, z: me.position.z, ry: me.rotation.y });
     }
