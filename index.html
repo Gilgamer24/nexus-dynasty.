@@ -2,41 +2,41 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Nexus Dynasty - Full Edition</title>
+    <title>Nexus Dynasty X6 - Grow Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #020502; font-family: 'Segoe UI', sans-serif; }
         .ui { position: absolute; inset: 0; pointer-events: none; }
-        .panel { position: absolute; background: rgba(0, 0, 0, 0.9); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; color: white; pointer-events: auto; }
-        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; }
+        .panel { position: absolute; background: rgba(0, 20, 0, 0.9); border: 2px solid #4dff4d; padding: 15px; border-radius: 10px; color: white; pointer-events: auto; }
+        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; border-color: #ffd700; }
         #menu { bottom: 20px; left: 20px; width: 280px; }
-        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; }
-        .btn:hover:not(:disabled) { background: #00f2ff; color: #000; }
-        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 12px; margin: 10px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; }
-        .label { position: absolute; color: white; font-weight: bold; font-size: 12px; text-shadow: 1px 1px #000; pointer-events: none; text-align: center; transform: translate(-50%, -100%); }
+        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #002200; color: #4dff4d; border: 1px solid #4dff4d; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        .btn:hover:not(:disabled) { background: #4dff4d; color: #000; }
+        .btn-tp { background: #ffd700; color: #000; border-color: #fff; }
+        #login-screen { position: absolute; inset: 0; background: #001100; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { padding: 12px; margin: 10px; width: 250px; background: #000; border: 1px solid #4dff4d; color: white; text-align: center; }
+        .label { position: absolute; color: white; font-weight: bold; font-size: 11px; text-shadow: 1px 1px #000; pointer-events: none; text-align: center; transform: translate(-50%, -100%); }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="color:#00f2ff; letter-spacing: 5px;">NEXUS DYNASTY</h1>
-        <input type="text" id="pseudo" placeholder="NOM DU ROYAUME">
-        <button class="btn" style="width: 200px;" onclick="connect()">COMMENCER</button>
+        <h1 style="color:#4dff4d; letter-spacing: 10px;">NEXUS DYNASTY</h1>
+        <input type="text" id="pseudo" placeholder="VOTRE NOM">
+        <button class="btn" style="width: 200px;" onclick="connect()">REJOINDRE LE MONDE</button>
     </div>
 
     <div class="ui">
         <div id="stats" class="panel">
-            <span>❤️ <span id="hp">100</span></span>
-            <span style="color:#4dff4d">🍞 <span id="food">100</span></span>
             <span style="color:#ffd700">💰 <span id="gold">0</span></span>
+            <span style="color:#4dff4d">🍞 <span id="food">100</span></span>
             <span style="color:#00f2ff">📦 <span id="ore">0</span></span>
         </div>
         <div id="menu" class="panel">
+            <button class="btn btn-tp" onclick="tpToVendor()">🚀 TP VENDEUR (GRATUIT)</button>
             <button class="btn" id="btn-house" onclick="buildHouse()">🏠 BÂTIR MAISON (100G)</button>
-            <button class="btn" id="btn-worker" onclick="addWorker()">🤖 RECRUTER MINEUR (150G)</button>
-            <button class="btn" onclick="buyFood()">🍞 ACHETER NOURRITURE (30G)</button>
-            <div style="font-size: 11px; color: #888; margin-top: 5px;">Shift: Courir | Clic Mineur: Nourrir (-20 Food)</div>
+            <button class="btn" id="btn-worker" onclick="addWorker()">🤖 MINEUR (150G)</button>
+            <button class="btn" onclick="buyFood()">🍞 NOURRITURE (30G)</button>
+            <div style="font-size: 10px; color: #aaa; margin-top:5px;">SHIFT: Sprint | CLIC Mineur fatigué: Nourrir</div>
         </div>
     </div>
 
@@ -49,8 +49,8 @@
 import * as THREE from 'three';
 
 const socket = io();
-let scene, camera, renderer, player, myStats;
-const ores = [], workers = [], houses = [];
+let scene, camera, renderer, player, vendor, myStats;
+const ores = [], workers = [], houses = [], remotePlayers = {};
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const keys = {};
@@ -60,58 +60,69 @@ window.connect = () => {
     if(p) socket.emit('login', { pseudo: p });
 };
 
-socket.on('authSuccess', (data) => {
+socket.on('initData', (data) => {
     myStats = data.me;
     document.getElementById('login-screen').style.display = 'none';
     initGame();
+    // Charger les maisons existantes des autres
+    data.houses.forEach(h => spawnHouseMesh(h.x, h.z, true));
+    // Charger les joueurs existants
+    Object.values(data.players).forEach(p => { if(p.id !== socket.id) createRemotePlayer(p); });
 });
 
 function initGame() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050505);
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    scene.background = new THREE.Color(0x051105);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const sun = new THREE.PointLight(0xffffff, 1, 500);
-    sun.position.set(50, 100, 50);
-    scene.add(sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const light = new THREE.DirectionalLight(0xffffff, 0.5);
+    light.position.set(100, 200, 100);
+    scene.add(light);
 
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshStandardMaterial({color: 0x1a1a1a}));
+    // TERRAIN X6 (3000x3000)
+    const groundGeo = new THREE.PlaneGeometry(3000, 3000);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a331a });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI/2;
     scene.add(ground);
+
+    // GRILLE STYLE "GARDEN"
+    const grid = new THREE.GridHelper(3000, 100, 0x00ff00, 0x002200);
+    grid.position.y = 0.05;
+    scene.add(grid);
+
+    // VENDEUR AU CENTRE (Grow a Garden style)
+    vendor = createChar(0xff00ff, true);
+    vendor.position.set(10, 0, 10);
+    scene.add(vendor);
 
     player = createChar(0x00f2ff);
     scene.add(player);
 
-    // Rochers éparpillés (pas au centre)
-    for(let i=0; i<100; i++) {
+    // MINERAIS (Éparpillés partout)
+    for(let i=0; i<200; i++) {
         const ang = Math.random() * Math.PI * 2;
-        const dist = 60 + Math.random() * 140;
-        const ore = new THREE.Mesh(new THREE.DodecahedronGeometry(0.8), new THREE.MeshStandardMaterial({color: 0x666666}));
-        ore.position.set(Math.cos(ang)*dist, 0.5, Math.sin(ang)*dist);
+        const dist = 80 + Math.random() * 600;
+        const ore = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2), new THREE.MeshStandardMaterial({color: 0x888888}));
+        ore.position.set(Math.cos(ang)*dist, 0.6, Math.sin(ang)*dist);
         scene.add(ore);
         ores.push(ore);
     }
 
-    myStats.houses.forEach(h => spawnHouse(h.x, h.z, true));
     animate();
 }
 
 function createChar(color, hat = false) {
     const g = new THREE.Group();
-    const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color}));
-    b.position.y = 0.6; g.add(b);
-    const eyeGeo = new THREE.SphereGeometry(0.06);
-    const eyeMat = new THREE.MeshBasicMaterial({color: 0x000000});
-    const e1 = new THREE.Mesh(eyeGeo, eyeMat); e1.position.set(0.15, 0.9, 0.3);
-    const e2 = new THREE.Mesh(eyeGeo, eyeMat); e2.position.set(-0.15, 0.9, 0.3);
-    g.add(e1, e2);
+    const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color}));
+    b.position.y = 0.75; g.add(b);
     if(hat) {
-        const h = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.15), new THREE.MeshStandardMaterial({color: 0x222}));
-        h.position.y = 1.1; g.add(h);
+        const h = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.2), new THREE.MeshStandardMaterial({color: 0x000}));
+        h.position.y = 1.4; g.add(h);
     }
     return g;
 }
@@ -123,84 +134,89 @@ function createLabel() {
     return div;
 }
 
-function spawnHouse(x, z, instant = false) {
+// MULTIJOUEUR
+socket.on('playerJoined', (p) => createRemotePlayer(p));
+socket.on('playerMoved', (p) => { if(remotePlayers[p.id]) remotePlayers[p.id].position.set(p.x, 0, p.z); });
+socket.on('playerLeft', (id) => { if(remotePlayers[id]) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; }});
+socket.on('houseBuilt', (h) => spawnHouseMesh(h.x, h.z, false));
+
+function createRemotePlayer(d) {
+    const p = createChar(0xff4444);
+    p.position.set(d.x, 0, d.z);
+    scene.add(p);
+    remotePlayers[d.id] = p;
+}
+
+function spawnHouseMesh(x, z, instant) {
     const g = new THREE.Group();
-    const base = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), new THREE.MeshStandardMaterial({color: 0x5d3a1a, transparent: true, opacity: instant ? 1 : 0.4}));
-    base.position.y = 1.5; g.add(base);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(5, 4, 5), new THREE.MeshStandardMaterial({color: 0x5d3a1a, transparent: !instant, opacity: instant?1:0.3}));
+    b.position.y = 2; g.add(b);
     g.position.set(x, 0, z);
     scene.add(g);
 
-    const hData = { mesh: g, x, z, stored: 0, progress: instant ? 100 : 0, label: createLabel() };
-    houses.push(hData);
+    const data = { mesh: g, stored: 0, progress: instant?100:0, label: createLabel() };
+    houses.push(data);
 
     if(!instant) {
         let itv = setInterval(() => {
-            hData.progress += 2;
-            base.scale.y = hData.progress / 100;
-            base.position.y = (3 * (hData.progress/100)) / 2;
-            if(hData.progress >= 100) {
-                clearInterval(itv);
-                base.material.opacity = 1;
-                const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 2, 4), new THREE.MeshStandardMaterial({color: 0x9d2323}));
-                roof.position.y = 4; roof.rotation.y = Math.PI/4;
-                g.add(roof);
+            data.progress += 2;
+            b.scale.y = data.progress/100;
+            if(data.progress >= 100) { 
+                clearInterval(itv); b.material.opacity = 1;
+                const r = new THREE.Mesh(new THREE.ConeGeometry(4, 3, 4), new THREE.MeshStandardMaterial({color:0x900}));
+                r.position.y = 5.5; r.rotation.y = Math.PI/4; g.add(r);
             }
-        }, 150);
+        }, 100);
     } else {
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 2, 4), new THREE.MeshStandardMaterial({color: 0x9d2323}));
-        roof.position.y = 4; roof.rotation.y = Math.PI/4;
-        g.add(roof);
+        const r = new THREE.Mesh(new THREE.ConeGeometry(4, 3, 4), new THREE.MeshStandardMaterial({color:0x900}));
+        r.position.y = 5.5; r.rotation.y = Math.PI/4; g.add(r);
     }
 }
+
+// ACTIONS
+window.tpToVendor = () => { player.position.set(15, 0, 15); };
 
 window.buildHouse = () => {
     if(myStats.gold >= 100) {
         myStats.gold -= 100;
-        spawnHouse(player.position.x, player.position.z);
-        myStats.houses.push({x: player.position.x, z: player.position.z});
-        socket.emit('saveAll', myStats);
+        socket.emit('newHouse', { x: player.position.x, z: player.position.z });
+        socket.emit('updatePlayer', myStats);
     }
 };
 
 window.addWorker = () => {
-    const readyHouses = houses.filter(h => h.progress >= 100);
-    if(myStats.gold >= 150 && readyHouses.length > 0) {
+    const rdy = houses.filter(h => h.progress >= 100);
+    if(myStats.gold >= 150 && rdy.length > 0) {
         myStats.gold -= 150;
-        const wMesh = createChar(0xffd700, true);
+        const wMesh = createChar(0xffff00, true);
         wMesh.position.copy(player.position);
         scene.add(wMesh);
-        workers.push({
-            mesh: wMesh, energy: 100, state: 'work',
-            target: ores[Math.floor(Math.random()*ores.length)],
-            home: readyHouses[readyHouses.length-1],
-            carrying: false, label: createLabel()
-        });
+        workers.push({ mesh: wMesh, energy: 100, state: 'work', home: rdy[rdy.length-1], label: createLabel(), target: ores[0], carrying: false });
     }
 };
 
-window.buyFood = () => { if(myStats.gold >= 30) { myStats.gold -= 30; myStats.food += 60; socket.emit('saveAll', myStats); } };
+window.buyFood = () => { if(myStats.gold >= 30) { myStats.gold -= 30; myStats.food += 60; socket.emit('updatePlayer', myStats); } };
 
 window.onkeydown = e => keys[e.code] = true;
 window.onkeyup = e => keys[e.code] = false;
 
 window.addEventListener('mousedown', (e) => {
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    mouse.x = (e.clientX/window.innerWidth)*2-1;
+    mouse.y = -(e.clientY/window.innerHeight)*2+1;
     raycaster.setFromCamera(mouse, camera);
 
-    const hitWorkers = raycaster.intersectObjects(workers.map(w => w.mesh), true);
-    if(hitWorkers.length > 0 && myStats.food >= 20) {
-        const w = workers.find(work => work.mesh === hitWorkers[0].object.parent || work.mesh === hitWorkers[0].object);
-        if(w && w.state === 'tired') { 
-            myStats.food -= 20; w.energy = 100; w.state = 'work'; socket.emit('saveAll', myStats);
-        }
+    // Nourrir
+    const hW = raycaster.intersectObjects(workers.map(w=>w.mesh), true);
+    if(hW.length > 0 && myStats.food >= 20) {
+        const w = workers.find(work => work.mesh === hW[0].object.parent || work.mesh === hW[0].object);
+        if(w && w.state === 'tired') { myStats.food -= 20; w.energy = 100; w.state = 'work'; }
     }
 
-    const hitOres = raycaster.intersectObjects(ores);
-    if(hitOres.length > 0 && player.position.distanceTo(hitOres[0].object.position) < 5) {
-        myStats.oreStock += 10;
-        hitOres[0].object.position.set(Math.random()*400-200, 0.5, Math.random()*400-200);
-        socket.emit('saveAll', myStats);
+    // Vendre au marchand
+    if(player.position.distanceTo(vendor.position) < 6 && myStats.oreStock > 0) {
+        myStats.gold += myStats.oreStock * 5;
+        myStats.oreStock = 0;
+        socket.emit('updatePlayer', myStats);
     }
 });
 
@@ -208,65 +224,69 @@ function animate() {
     requestAnimationFrame(animate);
     if(!player) return;
 
-    const speed = keys['ShiftLeft'] ? 0.6 : 0.3;
+    const speed = keys['ShiftLeft'] ? 0.8 : 0.4;
     if(keys['KeyW']) player.position.z -= speed;
     if(keys['KeyS']) player.position.z += speed;
     if(keys['KeyA']) player.position.x -= speed;
     if(keys['KeyD']) player.position.x += speed;
 
+    if(keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']) {
+        socket.emit('move', {x: player.position.x, z: player.position.z});
+        player.lookAt(player.position.x + (keys['KeyD']?1:keys['KeyA']?-1:0), 0, player.position.z + (keys['KeyS']?1:keys['KeyW']?-1:0));
+    }
+
+    // IA ROBOTS
     workers.forEach(w => {
         const p = w.mesh.position.clone().project(camera);
-        w.label.style.left = (p.x + 1) * 50 + '%'; w.label.style.top = -(p.y - 1) * 50 + '%';
-        w.label.innerText = w.state === 'tired' ? '💤 REPOS' : `⚡ ${Math.floor(w.energy)}%`;
-        w.label.style.color = w.state === 'tired' ? 'red' : 'yellow';
-
+        w.label.style.left = (p.x+1)*50+'%'; w.label.style.top = -(p.y-1)*50+'%';
+        w.label.innerText = w.state==='tired'?'💤':'⚡'+Math.floor(w.energy)+'%';
+        
         if(w.state === 'tired') {
-            if(w.mesh.position.distanceTo(w.home.mesh.position) > 3) {
+            const d = w.mesh.position.distanceTo(w.home.mesh.position);
+            if(d > 3) {
                 const dir = new THREE.Vector3().subVectors(w.home.mesh.position, w.mesh.position).normalize();
-                w.mesh.position.add(dir.multiplyScalar(0.2));
-                w.mesh.lookAt(w.home.mesh.position);
+                w.mesh.position.add(dir.multiplyScalar(0.2)); w.mesh.lookAt(w.home.mesh.position);
             }
         } else {
             const target = w.carrying ? w.home.mesh.position : w.target.position;
             if(w.mesh.position.distanceTo(target) > 2) {
                 const dir = new THREE.Vector3().subVectors(target, w.mesh.position).normalize();
-                w.mesh.position.add(dir.multiplyScalar(0.25)); w.mesh.lookAt(target);
+                w.mesh.position.add(dir.multiplyScalar(0.3)); w.mesh.lookAt(target);
             } else {
                 if(!w.carrying) {
-                    w.carrying = true; w.energy -= 20;
+                    w.carrying = true; w.energy -= 15;
                     if(w.energy <= 0) w.state = 'tired';
-                    w.target.position.set(Math.random()*400-200, 0.5, Math.random()*400-200);
-                } else {
-                    w.home.stored += 15; w.carrying = false;
                     w.target = ores[Math.floor(Math.random()*ores.length)];
+                } else {
+                    w.home.stored += 10; w.carrying = false;
                 }
             }
         }
     });
 
+    // MAISONS
     houses.forEach(h => {
         const p = h.mesh.position.clone().project(camera);
-        h.label.style.left = (p.x + 1) * 50 + '%'; h.label.style.top = -(p.y - 1) * 50 + '%';
-        h.label.innerText = h.progress < 100 ? `🔨 ${h.progress}%` : `📦 STO: ${h.stored}`;
-        if(h.progress >= 100 && player.position.distanceTo(h.mesh.position) < 4.5 && h.stored > 0) {
-            myStats.oreStock += h.stored; h.stored = 0; socket.emit('saveAll', myStats);
+        h.label.style.left = (p.x+1)*50+'%'; h.label.style.top = -(p.y-1)*50+'%';
+        h.label.innerText = h.progress < 100 ? '🔨'+h.progress+'%' : '📦'+h.stored;
+        if(h.progress>=100 && player.position.distanceTo(h.mesh.position) < 5 && h.stored > 0) {
+            myStats.oreStock += h.stored; h.stored = 0; socket.emit('updatePlayer', myStats);
         }
     });
 
-    camera.position.lerp(new THREE.Vector3(player.position.x, 35, player.position.z + 30), 0.1);
+    camera.position.lerp(new THREE.Vector3(player.position.x, 40, player.position.z + 35), 0.1);
     camera.lookAt(player.position);
     renderer.render(scene, camera);
     updateUI();
 }
 
 function updateUI() {
-    document.getElementById('hp').innerText = Math.floor(myStats.hp);
-    document.getElementById('food').innerText = Math.floor(myStats.food);
     document.getElementById('gold').innerText = Math.floor(myStats.gold);
+    document.getElementById('food').innerText = Math.floor(myStats.food);
     document.getElementById('ore').innerText = Math.floor(myStats.oreStock);
 }
 
-setInterval(() => { if(myStats) { myStats.food -= 0.3; socket.emit('saveAll', myStats); } }, 1000);
+setInterval(() => { if(myStats) { myStats.food -= 0.2; socket.emit('updatePlayer', myStats); } }, 1000);
 </script>
 </body>
 </html>
