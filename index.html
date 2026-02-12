@@ -2,61 +2,43 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Nexus Dynasty : Économie & Marché</title>
+    <title>Nexus Dynasty : Architecte Persistant</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; color: white; }
-        .ui-layer { position: absolute; pointer-events: none; inset: 0; }
-        .panel { position: absolute; background: rgba(0, 5, 15, 0.9); border: 2px solid #00f2ff; padding: 12px; border-radius: 10px; pointer-events: auto; box-shadow: 0 0 15px rgba(0,242,255,0.2); }
-        
-        #stats { top: 10px; left: 10px; display: flex; gap: 15px; font-weight: bold; }
-        #inventory { top: 60px; left: 10px; border-color: #ffd700; color: #ffd700; }
-        
-        #menu { bottom: 20px; left: 20px; width: 280px; }
-        #market-ui { top: 10px; right: 10px; width: 250px; max-height: 300px; overflow-y: auto; display: none; }
-
-        .btn { width: 100%; padding: 10px; margin: 4px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; border-radius: 4px; }
-        .btn:hover { background: #00f2ff; color: #000; }
-        .btn-sell { background: #1a1a00; color: #ffd700; border-color: #ffd700; }
-
-        #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 12px; margin: 10px; width: 220px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; }
-
-        .trade-zone { position: absolute; bottom: 200px; left: 50%; transform: translateX(-50%); background: gold; color: black; padding: 10px; border-radius: 20px; display: none; font-weight: bold; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Verdana', sans-serif; }
+        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; border-radius: 8px; color: white; pointer-events: auto; }
+        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; }
+        #menu { bottom: 20px; left: 20px; width: 300px; }
+        .btn { width: 100%; padding: 12px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; }
+        .btn:hover:not(:disabled) { background: #00f2ff; color: #000; }
+        #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        #death-screen { position: absolute; inset: 0; background: rgba(100,0,0,0.9); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        input { padding: 12px; margin: 10px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="color: #00f2ff; letter-spacing: 5px;">NEXUS DYNASTY</h1>
+        <h1>NEXUS DYNASTY</h1>
         <input type="text" id="pseudo" placeholder="PSEUDO">
-        <button class="btn" style="width: 150px;" onclick="connect()">ENTRER</button>
+        <button class="btn" style="width: 200px;" onclick="connect()">CHARGER MA PARTIE</button>
     </div>
 
-    <div id="trade-prompt" class="trade-zone">💰 APPUYEZ SUR [E] POUR VENDRE AU MARCHAND</div>
+    <div id="death-screen">
+        <h1>VOUS ÊTES MORT</h1>
+        <button class="btn" style="width: 200px;" onclick="respawn()">RENAÎTRE (GARDE LES BÂTIMENTS)</button>
+    </div>
 
-    <div class="ui-layer">
-        <div id="stats" class="panel">
-            <span style="color:#ff4d4d">❤️ <span id="hp">100</span></span>
-            <span style="color:#4dff4d">🍞 <span id="food">100</span></span>
-            <span style="color:#00f2ff">💰 <span id="gold">0</span></span>
-        </div>
+    <div id="stats" class="panel">
+        <span style="color:#ff4444">❤️ <span id="hp">100</span></span>
+        <span style="color:#44ff44">🍞 <span id="food">100</span></span>
+        <span style="color:#ffd700">💰 <span id="gold">0</span></span>
+        <span style="color:#00f2ff">📦 <span id="ore">0</span></span>
+    </div>
 
-        <div id="inventory" class="panel">
-            📦 STOCK MINERAI: <span id="ore-qty">0</span>
-        </div>
-
-        <div id="market-ui" class="panel">
-            <h3 style="margin:0 0 10px 0; color:#ffd700">🛒 SHOP GLOBAL</h3>
-            <div id="market-list"></div>
-            <hr>
-            <button class="btn btn-sell" onclick="postToMarket()">VENDRE 10 MINERAIS (50G)</button>
-        </div>
-
-        <div id="menu" class="panel">
-            <button class="btn" onclick="buildHouse()">🏠 POSER MAISON (100G)</button>
-            <button class="btn" onclick="addWorker()">🤖 RECRUTER MINEUR (150G)</button>
-            <button class="btn" onclick="toggleMarket()">🌐 OUVRIR LE SHOP GLOBAL</button>
-        </div>
+    <div id="menu" class="panel">
+        <button class="btn" onclick="buildHouse()">🏠 POSER MAISON (100G)</button>
+        <button class="btn" id="btn-worker" onclick="addWorker()">🤖 RECRUTER MINEUR (150G)</button>
+        <button class="btn" onclick="buyFood()">🍞 ACHETER NOURRITURE (30G)</button>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -66,158 +48,167 @@
 import * as THREE from 'three';
 
 const socket = io();
-let scene, camera, renderer, player, merchant, myStats;
-const workers = [], ores = [], myHouses = [];
+let scene, camera, renderer, player, myStats;
+const ores = [], workers = [], houses = [];
 
 window.connect = () => {
-    const ps = document.getElementById('pseudo').value;
-    if(ps) socket.emit('login', { pseudo: ps });
+    const p = document.getElementById('pseudo').value;
+    if(p) socket.emit('login', { pseudo: p });
+};
+
+window.respawn = () => {
+    socket.emit('respawnRequest');
+    document.getElementById('death-screen').style.display = 'none';
 };
 
 socket.on('authSuccess', (data) => {
-    myStats = data.user;
+    myStats = data;
     document.getElementById('login-screen').style.display = 'none';
-    init();
+    if(!scene) initGame();
+    else reloadScene();
 });
 
-function init() {
+function initGame() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB);
+    scene.background = new THREE.Color(0x87CEEB); // CIEL BLEU
+    
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.5);
+    sun.position.set(10, 20, 10);
+    scene.add(sun);
 
-    // Sol Herbe
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({color: 0x228B22}));
+    // SOL VERT
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({color: 0x2d8a2d}));
     ground.rotation.x = -Math.PI/2;
     scene.add(ground);
 
-    // Joueur
+    // JOUEUR
     player = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
-    player.position.y = 0.8;
+    player.position.y = 1;
     scene.add(player);
 
-    // PNG MARCHAND (Cube Violet)
-    merchant = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0x9932CC}));
-    merchant.position.set(10, 1, 10);
-    scene.add(merchant);
-
-    // Minerais
-    const oreGeo = new THREE.DodecahedronGeometry(0.8);
-    for(let i=0; i<30; i++) {
+    // MINERAIS
+    const oreGeo = new THREE.DodecahedronGeometry(0.7);
+    for(let i=0; i<40; i++) {
         const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({color: 0x555555}));
-        ore.position.set(Math.random()*100-50, 0.4, Math.random()*100-50);
+        ore.position.set(Math.random()*160-80, 0.4, Math.random()*160-80);
         scene.add(ore);
         ores.push(ore);
     }
 
-    const keys = {};
-    window.onkeydown = e => {
-        keys[e.code] = true;
-        if(e.code === 'KeyE' && player.position.distanceTo(merchant.position) < 4) {
-            sellToMerchant();
+    // CLIC POUR MINER
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    window.onclick = (e) => {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(ores);
+        if(hits.length > 0) {
+            myStats.oreStock += 1;
+            hits[0].object.scale.multiplyScalar(0.9);
+            if(hits[0].object.scale.x < 0.4) {
+                hits[0].object.scale.set(1,1,1);
+                hits[0].object.position.set(Math.random()*160-80, 0.4, Math.random()*160-80);
+            }
         }
     };
-    window.onkeyup = e => keys[e.code] = false;
 
-    function animate() {
-        requestAnimationFrame(animate);
-        
-        // Move Player
-        if(keys['KeyW']) player.position.z -= 0.2;
-        if(keys['KeyS']) player.position.z += 0.2;
-        if(keys['KeyA']) player.position.x -= 0.2;
-        if(keys['KeyD']) player.position.x += 0.2;
-
-        // IA Mineurs
-        workers.forEach(w => {
-            const target = w.carrying ? w.homeBase.mesh : w.targetOre;
-            if(w.mesh.position.distanceTo(target.position) > 1.5) {
-                const dir = new THREE.Vector3().subVectors(target.position, w.mesh.position).normalize();
-                w.mesh.position.add(dir.multiplyScalar(0.12));
-            } else {
-                if(!w.carrying) { 
-                    w.carrying = true; 
-                } else {
-                    w.homeBase.storedOre += 1; // Stocke du minerai brut
-                    w.carrying = false;
-                    w.targetOre = ores[Math.floor(Math.random()*ores.length)];
-                }
-            }
-        });
-
-        // Récupération aux Maisons
-        myHouses.forEach(h => {
-            if(player.position.distanceTo(h.mesh.position) < 3) {
-                myStats.oreStock += h.storedOre;
-                h.storedOre = 0;
-            }
-        });
-
-        // Distance Marchand
-        const distToMerchant = player.position.distanceTo(merchant.position);
-        document.getElementById('trade-prompt').style.display = distToMerchant < 4 ? 'block' : 'none';
-
-        // Marchand qui bouge un peu
-        merchant.position.x += Math.sin(Date.now()*0.001)*0.02;
-
-        camera.position.lerp(new THREE.Vector3(player.position.x, 15, player.position.z + 15), 0.1);
-        camera.lookAt(player.position);
-        renderer.render(scene, camera);
-        updateUI();
-    }
+    reloadScene(); // Charge les maisons
     animate();
-
-    // Faim
-    setInterval(() => {
-        myStats.food = Math.max(0, myStats.food - 0.5);
-        if(myStats.food <= 0) myStats.hp -= 1;
-        socket.emit('updateStats', myStats);
-    }, 1000);
 }
 
-// FONCTIONS ÉCONOMIE
-function sellToMerchant() {
-    if(myStats.oreStock > 0) {
-        const amount = myStats.oreStock;
-        myStats.oreStock = 0;
-        myStats.gold += amount * 8; // Le PNG achète à 8G l'unité
-        alert(`Vendu ! +${amount * 8} Or`);
-    }
+function reloadScene() {
+    // Nettoie et recrée les maisons sauvegardées
+    houses.forEach(h => scene.remove(h.mesh));
+    houses.length = 0;
+    myStats.houses.forEach(pos => spawnHouseMesh(pos));
 }
 
-window.postToMarket = () => {
-    if(myStats.oreStock >= 10) {
-        myStats.oreStock -= 10;
-        socket.emit('postOffer', { seller: myStats.pseudo, qty: 10, price: 50 });
-    }
-};
+function spawnHouseMesh(pos) {
+    const group = new THREE.Group();
+    const b = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), new THREE.MeshStandardMaterial({color: 0x8B4513}));
+    const r = new THREE.Mesh(new THREE.ConeGeometry(2.5, 2, 4), new THREE.MeshStandardMaterial({color: 0xff0000}));
+    r.position.y = 2; r.rotation.y = Math.PI/4;
+    group.add(b, r);
+    group.position.set(pos.x, 1, pos.z);
+    scene.add(group);
+    houses.push({ mesh: group, stored: 0 });
+}
 
-window.toggleMarket = () => {
-    const m = document.getElementById('market-ui');
-    m.style.display = m.style.display === 'none' ? 'block' : 'none';
-};
+const keys = {};
+window.onkeydown = e => keys[e.code] = true;
+window.onkeyup = e => keys[e.code] = false;
+
+function animate() {
+    if(myStats.hp <= 0) {
+        document.getElementById('death-screen').style.display = 'flex';
+        return requestAnimationFrame(animate);
+    }
+
+    requestAnimationFrame(animate);
+
+    if(keys['KeyW']) player.position.z -= 0.2;
+    if(keys['KeyS']) player.position.z += 0.2;
+    if(keys['KeyA']) player.position.x -= 0.2;
+    if(keys['KeyD']) player.position.x += 0.2;
+
+    // IA MINEURS
+    workers.forEach(w => {
+        const target = w.carrying ? w.home.mesh : w.target;
+        if(w.mesh.position.distanceTo(target.position) > 1.5) {
+            const dir = new THREE.Vector3().subVectors(target.position, w.mesh.position).normalize();
+            w.mesh.position.add(dir.multiplyScalar(0.12));
+        } else {
+            if(!w.carrying) { w.carrying = true; } 
+            else { w.home.stored += 1; w.carrying = false; w.target = ores[Math.floor(Math.random()*ores.length)]; }
+        }
+    });
+
+    // Collecte maisons
+    houses.forEach(h => {
+        if(player.position.distanceTo(h.mesh.position) < 3) {
+            myStats.oreStock += h.stored;
+            h.stored = 0;
+        }
+    });
+
+    camera.position.lerp(new THREE.Vector3(player.position.x, 15, player.position.z + 15), 0.1);
+    camera.lookAt(player.position);
+    renderer.render(scene, camera);
+    updateUI();
+}
 
 window.buildHouse = () => {
     if(myStats.gold >= 100) {
         myStats.gold -= 100;
-        const h = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), new THREE.MeshStandardMaterial({color: 0x8B4513}));
-        h.position.set(player.position.x, 1, player.position.z - 5);
-        scene.add(h);
-        myHouses.push({ mesh: h, storedOre: 0 });
+        const pos = { x: player.position.x, z: player.position.z - 5 };
+        myStats.houses.push(pos);
+        spawnHouseMesh(pos);
+        socket.emit('saveAll', myStats);
     }
 };
 
 window.addWorker = () => {
-    if(myStats.gold >= 150 && myHouses.length > 0) {
+    if(myStats.gold >= 150 && houses.length > 0) {
         myStats.gold -= 150;
-        const w = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color: 0xffff00}));
-        w.position.copy(player.position);
-        scene.add(w);
-        workers.push({ mesh: w, carrying: false, targetOre: ores[0], homeBase: myHouses[0] });
+        const m = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color: 0xffff00}));
+        m.position.copy(player.position);
+        scene.add(m);
+        workers.push({ mesh: m, carrying: false, target: ores[0], home: houses[houses.length-1] });
+    }
+};
+
+window.buyFood = () => {
+    if(myStats.gold >= 30) {
+        myStats.gold -= 30;
+        myStats.food = Math.min(100, myStats.food + 40);
+        socket.emit('saveAll', myStats);
     }
 };
 
@@ -225,17 +216,17 @@ function updateUI() {
     document.getElementById('hp').innerText = Math.floor(myStats.hp);
     document.getElementById('food').innerText = Math.floor(myStats.food);
     document.getElementById('gold').innerText = Math.floor(myStats.gold);
-    document.getElementById('ore-qty').innerText = myStats.oreStock;
+    document.getElementById('ore').innerText = myStats.oreStock;
 }
 
-socket.on('marketUpdate', (list) => {
-    const div = document.getElementById('market-list');
-    div.innerHTML = list.map(o => `
-        <div style="font-size:12px; border-bottom:1px solid #333; padding:5px;">
-            ${o.seller}: ${o.qty} Minerais pour ${o.price}G
-        </div>
-    `).join('');
-});
+// Survie et sauvegarde auto
+setInterval(() => {
+    if(myStats && myStats.hp > 0) {
+        myStats.food = Math.max(0, myStats.food - 0.4);
+        if(myStats.food <= 0) myStats.hp -= 2;
+        socket.emit('saveAll', myStats);
+    }
+}, 1000);
 </script>
 </body>
 </html>
