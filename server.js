@@ -5,19 +5,31 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
-let db = { users: {} };
+let db = { 
+    users: {}, 
+    globalHouses: [] 
+};
 
 io.on('connection', (socket) => {
     socket.on('login', (data) => {
-        const { pseudo, mdp } = data;
+        const { pseudo } = data;
         if (!db.users[pseudo]) {
             db.users[pseudo] = { 
-                pseudo, mdp, gold: 0, food: 100, hp: 100, 
-                workersCount: 0, houses: [], tutoStep: 0 
+                pseudo, gold: 0, food: 100, hp: 100, 
+                houses: [], tutoStep: 0 
             };
         }
         socket.userId = pseudo;
-        socket.emit('authSuccess', db.users[pseudo]);
+        // Envoi des données initiales et des bâtiments existants
+        socket.emit('authSuccess', {
+            user: db.users[pseudo],
+            houses: db.globalHouses
+        });
+    });
+
+    socket.on('buildGlobal', (houseData) => {
+        db.globalHouses.push(houseData);
+        io.emit('newHouse', houseData);
     });
 
     socket.on('updateStats', (s) => {
@@ -27,11 +39,7 @@ io.on('connection', (socket) => {
             db.users[socket.userId].hp = Number(s.hp) || 0;
         }
     });
-
-    socket.on('saveBuild', (houseData) => {
-        if(socket.userId) db.users[socket.userId].houses.push(houseData);
-    });
 });
 
 const PORT = 3000;
-http.listen(PORT, () => console.log(`Serveur Nexus v6 tournant sur http://localhost:${PORT}`));
+http.listen(PORT, () => console.log(`Serveur Nexus Logistique sur http://localhost:${PORT}`));
