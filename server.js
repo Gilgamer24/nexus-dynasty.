@@ -5,45 +5,40 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
-let db = { users: {}, buildings: [] };
+// Base de données simplifiée pour la session
+let db = { users: {} };
 
 io.on('connection', (socket) => {
     socket.on('login', (data) => {
         const { pseudo, mdp } = data;
+        // Si l'utilisateur n'existe pas, on le crée avec des valeurs de base propres
         if (!db.users[pseudo]) {
             db.users[pseudo] = { 
-                pseudo, mdp, gold: 200, food: 100, hp: 100, 
-                workers: 0, lastUpdate: Date.now() 
+                pseudo, 
+                mdp, 
+                gold: 200, 
+                food: 100, 
+                hp: 100, 
+                workersCount: 0 
             };
-        } else if (db.users[pseudo].mdp !== mdp) {
-            return socket.emit('authError', "Mauvais mot de passe");
         }
         socket.userId = pseudo;
-        socket.emit('authSuccess', { user: db.users[pseudo], buildings: db.buildings });
+        socket.emit('authSuccess', db.users[pseudo]);
     });
 
-    // Production automatique des mineurs
-    socket.on('buyWorker', () => {
-        let u = db.users[socket.userId];
-        if (u && u.gold >= 100) {
-            u.gold -= 100;
-            u.workers += 1;
-            socket.emit('updateStats', u);
-        }
-    });
-
-    socket.on('requestRespawn', () => {
-        if(socket.userId) {
-            let u = db.users[socket.userId];
-            u.gold = Math.floor(u.gold * 0.6);
-            u.hp = 100; u.food = 100;
-            socket.emit('respawnDone', u);
+    // Sauvegarde des stats envoyées par le client
+    socket.on('updateStats', (stats) => {
+        if (socket.userId) {
+            db.users[socket.userId] = stats;
         }
     });
 
     socket.on('move', (pos) => {
-        if(socket.userId) socket.broadcast.emit('pMoved', { id: socket.userId, pos });
+        if (socket.userId) {
+            socket.broadcast.emit('pMoved', { id: socket.userId, pos });
+        }
     });
 });
 
-http.listen(3000, () => console.log("Nexus Economy Engine Ready"));
+const PORT = 3000;
+http.listen(PORT, () => console.log(`Serveur Nexus actif sur http://localhost:${PORT}`));
