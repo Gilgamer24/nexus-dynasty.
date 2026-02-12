@@ -1,30 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty - Beta</title>
+    <title>Nexus Dynasty - HD</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #a0c4ff; font-family: 'Segoe UI', sans-serif; }
         #ui { position: absolute; top: 15px; left: 15px; user-select: none; pointer-events: none; }
-        .hud-box { background: rgba(0, 0, 0, 0.6); color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #FFD700; margin-bottom: 10px; backdrop-filter: blur(5px); }
-        h2 { margin: 0 0 5px 0; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
-        #score { color: #FFD700; font-weight: bold; font-size: 24px; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: white; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 4px black; }
-        #notif { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); color: #FFD700; font-size: 20px; font-weight: bold; opacity: 0; transition: opacity 0.5s; text-shadow: 0 2px 4px black; }
+        .hud-box { background: rgba(0, 0, 0, 0.7); color: white; padding: 15px; border-radius: 12px; border-bottom: 4px solid #FFD700; margin-bottom: 10px; backdrop-filter: blur(8px); min-width: 180px; }
+        h2 { margin: 0; font-size: 14px; color: #aaa; text-transform: uppercase; }
+        #score { color: #FFD700; font-weight: bold; font-size: 32px; display: block; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translate(-50%, -50%); outline: 100px solid rgba(255,255,255,0.1); }
     </style>
 </head>
 <body>
     <div id="ui">
         <div class="hud-box">
-            <h2>Nexus Dynasty</h2>
-            Fragments: <span id="score">0</span>
-        </div>
-        <div class="hud-box" style="font-size: 12px; border-left-color: #4CAF50;">
-            Z,Q,S,D : Bouger<br>ESPACE : Sauter<br>SOURIS : Regarder
+            <h2>Fragments Récoltés</h2>
+            <span id="score">0</span>
         </div>
     </div>
-    <div id="notif">+1 FRAGMENT !</div>
-    <div id="crosshair"></div>
-
 <script src="/socket.io/socket.io.js"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
 
@@ -33,135 +26,71 @@ import * as THREE from 'three';
 
 const socket = io();
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+scene.background = new THREE.Color(0xa0c4ff);
+scene.fog = new THREE.FogExp2(0xa0c4ff, 0.02); // Brouillard plus naturel
 
-// --- CAMÉRA & RENDU ---
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Ombres douces
+renderer.toneMapping = THREE.ReinhardToneMapping; // Meilleures couleurs
 document.body.appendChild(renderer.domElement);
 
-// --- LUMIÈRES ---
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
-scene.add(hemiLight);
-const sun = new THREE.DirectionalLight(0xffffff, 0.9);
-sun.position.set(50, 80, 30);
-sun.castShadow = true;
-sun.shadow.camera.top = 50;
-sun.shadow.camera.bottom = -50;
-sun.shadow.camera.left = -50;
-sun.shadow.camera.right = 50;
-sun.shadow.mapSize.width = 2048;
-sun.shadow.mapSize.height = 2048;
+// --- LUMIÈRES STYLE "CARTOON HD" ---
+const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(20, 50, 20);
 scene.add(sun);
 
-// --- MONDE (Relief & Couleurs) ---
+// --- TERRAIN AVANCÉ ---
 function getHeight(x, z) {
-    // Relief plus prononcé et complexe
-    return (Math.sin(x * 0.04) * 3 + Math.cos(z * 0.04) * 3) + (Math.sin(x * 0.15 + z * 0.1) * 1);
+    // Un relief plus varié : grandes collines + petites bosses
+    return (Math.sin(x * 0.03) * 4 + Math.cos(z * 0.03) * 4) + (Math.sin(x * 0.1) * 1);
 }
 
-// Création du sol avec Vertex Colors (Dégradés)
-const geometry = new THREE.PlaneGeometry(200, 200, 100, 100);
-const count = geometry.attributes.position.count;
+const geo = new THREE.PlaneGeometry(240, 240, 100, 100);
 const colors = [];
-const colorTop = new THREE.Color(0x7CFC00); // Vert clair (Haut)
-const colorBot = new THREE.Color(0x228B22); // Vert foncé (Bas)
-
-for (let i = 0; i < count; i++) {
-    const x = geometry.attributes.position.getX(i);
-    const z = geometry.attributes.position.getY(i); // Y est Z ici
+const pos = geo.attributes.position;
+for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getY(i);
     const h = getHeight(x, z);
+    pos.setZ(i, h);
     
-    geometry.attributes.position.setZ(i, h);
-    
-    // Mélange des couleurs selon la hauteur
-    const mixedColor = colorBot.clone().lerp(colorTop, (h + 5) / 10);
-    colors.push(mixedColor.r, mixedColor.g, mixedColor.b);
+    // Couleur : Sable si bas, Herbe si moyen, Sommet clair si haut
+    const c = new THREE.Color();
+    if (h < -2) c.setHex(0xd4a373); // Sable/Terre
+    else if (h > 3) c.setHex(0x90be6d); // Herbe claire
+    else c.setHex(0x4d908e); // Herbe foncée
+    colors.push(c.r, c.g, c.b);
 }
-geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-geometry.computeVertexNormals();
+geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+geo.computeVertexNormals();
 
-const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
-const ground = new THREE.Mesh(geometry, groundMat);
+const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
 ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
 scene.add(ground);
 
-// --- DÉCORS (Arbres & Cristaux) ---
-const obstacles = [];
+// --- FRAGMENTS & DÉCORS ---
 const fragments = [];
-
-function addTree(x, z) {
-    const y = getHeight(x, z);
-    const group = new THREE.Group();
+for(let i=0; i<40; i++) {
+    const fx = (Math.random() - 0.5) * 150;
+    const fz = (Math.random() - 0.5) * 150;
+    const fy = getHeight(fx, fz) + 1.5;
     
-    // Tronc
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2, 6), new THREE.MeshStandardMaterial({color: 0x5D4037}));
-    trunk.position.y = 1;
-    trunk.castShadow = true;
-    
-    // Feuilles (Low Poly style)
-    const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(1.8), new THREE.MeshStandardMaterial({color: 0x2E8B57}));
-    leaves.position.y = 3;
-    leaves.castShadow = true;
-    
-    group.add(trunk, leaves);
-    group.position.set(x, y, z);
-    
-    // Variation de taille aléatoire
-    const scale = 0.8 + Math.random() * 0.5;
-    group.scale.set(scale, scale, scale);
-    
-    scene.add(group);
-    obstacles.push({x, z, r: 1.5 * scale});
-}
-
-function addFragment(x, z) {
-    const y = getHeight(x, z) + 1.5;
-    const geo = new THREE.OctahedronGeometry(0.5);
-    const mat = new THREE.MeshStandardMaterial({ color: 0x9932CC, emissive: 0x4B0082, metalness: 0.8 });
-    const crystal = new THREE.Mesh(geo, mat);
-    crystal.position.set(x, y, z);
+    const crystal = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.6, 0),
+        new THREE.MeshStandardMaterial({ color: 0x00f2ff, emissive: 0x0066ff, metalness: 1, roughness: 0 })
+    );
+    crystal.position.set(fx, fy, fz);
     scene.add(crystal);
     fragments.push(crystal);
 }
 
-// Génération procédurale fixe
-for(let i=0; i<60; i++) {
-    // Position pseudo-aléatoire mais identique pour tous les joueurs
-    const x = Math.sin(i * 999) * 80;
-    const z = Math.cos(i * 888) * 80;
-    
-    if (i % 5 === 0) addFragment(x, z); // 1 fragment tous les 5 arbres
-    else addTree(x, z);
-}
-
-// --- JOUEUR & MULTIJOUEUR ---
-let myPlayerGroup, myScore = 0;
-const otherPlayers = {};
-
-function updateScore(val) {
-    myScore = val;
-    document.getElementById('score').innerText = myScore;
-    const notif = document.getElementById('notif');
-    notif.style.opacity = 1;
-    notif.style.top = "15%";
-    setTimeout(() => { notif.style.opacity = 0; notif.style.top = "20%"; }, 1000);
-}
-
-// --- SETUP INITIAL ---
-myPlayerGroup = new THREE.Group();
-scene.add(myPlayerGroup);
+// --- JOUEUR ---
 let myPos = new THREE.Vector3(0, 10, 0);
-
-// --- BOUCLE DE JEU ---
-let velocityY = 0;
-let canJump = false;
-let yaw = 0, pitch = 0;
+let myScore = 0;
+let yaw = 0, pitch = 0, velocityY = 0, canJump = false;
 const keys = {};
 
 document.body.onclick = () => document.body.requestPointerLock();
@@ -175,84 +104,47 @@ document.onmousemove = e => {
 window.onkeydown = e => keys[e.code] = true;
 window.onkeyup = e => keys[e.code] = false;
 
-// Gestion Multi
-socket.on('currentPlayers', (players) => {
-    Object.keys(players).forEach(id => {
-        if(id !== socket.id && !otherPlayers[id]) spawnOther(id, players[id]);
-    });
+// Multi
+const otherPlayers = {};
+socket.on('playerMoved', p => {
+    if(otherPlayers[p.id]) otherPlayers[p.id].position.lerp(new THREE.Vector3(p.x, p.y, p.z), 0.2);
+    else {
+        const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.8), new THREE.MeshStandardMaterial({color: 0xff4477}));
+        scene.add(m); otherPlayers[p.id] = m;
+    }
 });
-socket.on('newPlayer', (p) => spawnOther(p.id, p));
-socket.on('playerMoved', (p) => {
-    if(otherPlayers[p.id]) otherPlayers[p.id].position.lerp(new THREE.Vector3(p.x, p.y, p.z), 0.3);
-});
-socket.on('playerDisconnected', (id) => {
-    if(otherPlayers[id]) { scene.remove(otherPlayers[id]); delete otherPlayers[id]; }
-});
-
-function spawnOther(id, data) {
-    const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.8), new THREE.MeshStandardMaterial({color: 0xff4444}));
-    mesh.position.set(data.x, data.y, data.z);
-    scene.add(mesh);
-    otherPlayers[id] = mesh;
-}
 
 function animate() {
     requestAnimationFrame(animate);
-
+    
     if (document.pointerLockElement === document.body) {
-        const dir = new THREE.Vector3();
-        if (keys['KeyW']) dir.z -= 1;
-        if (keys['KeyS']) dir.z += 1;
-        if (keys['KeyA']) dir.x -= 1;
-        if (keys['KeyD']) dir.x += 1;
+        const move = new THREE.Vector3();
+        if (keys['KeyW']) move.z -= 1; if (keys['KeyS']) move.z += 1;
+        if (keys['KeyA']) move.x -= 1; if (keys['KeyD']) move.x += 1;
+        move.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).normalize().multiplyScalar(0.28);
         
-        dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        if (dir.length() > 0) dir.normalize().multiplyScalar(0.25);
-
-        // Prédiction collision
-        const nextX = myPos.x + dir.x;
-        const nextZ = myPos.z + dir.z;
-        let collide = false;
-        
-        // Collision Arbres
-        for(let o of obstacles) {
-            if (Math.hypot(nextX - o.x, nextZ - o.z) < o.r) collide = true;
-        }
-
-        // Collision Fragments (Ramassage)
-        for(let i = fragments.length - 1; i >= 0; i--) {
-            const f = fragments[i];
-            f.rotation.y += 0.02; // Animation
-            f.position.y = getHeight(f.position.x, f.position.z) + 1.5 + Math.sin(Date.now()*0.003)*0.3; // Flottement
-
-            if (myPos.distanceTo(f.position) < 1.5) {
-                scene.remove(f);
-                fragments.splice(i, 1);
-                updateScore(myScore + 1);
-            }
-        }
-
-        if(!collide) { myPos.x = nextX; myPos.z = nextZ; }
+        myPos.add(move);
         if (keys['Space'] && canJump) { velocityY = 0.5; canJump = false; }
     }
 
-    // Physique Y
-    velocityY -= 0.025;
+    velocityY -= 0.02;
     myPos.y += velocityY;
-    const groundH = getHeight(myPos.x, myPos.z);
-    if (myPos.y < groundH + 1.6) {
-        myPos.y = groundH + 1.6;
-        velocityY = 0;
-        canJump = true;
-    }
+    const h = getHeight(myPos.x, myPos.z) + 1.6;
+    if (myPos.y < h) { myPos.y = h; velocityY = 0; canJump = true; }
 
-    // Envoi
+    // Collecte
+    fragments.forEach((f, i) => {
+        f.rotation.y += 0.03;
+        f.position.y += Math.sin(Date.now()*0.005)*0.01;
+        if(myPos.distanceTo(f.position) < 1.5) {
+            f.position.set(0,-100,0); // Cache le fragment
+            myScore++; document.getElementById('score').innerText = myScore;
+        }
+    });
+
     socket.emit('playerMovement', { x: myPos.x, y: myPos.y, z: myPos.z });
-
-    // Caméra
     camera.position.copy(myPos);
     camera.rotation.set(pitch, yaw, 0, 'YXZ');
-
     renderer.render(scene, camera);
 }
 animate();
