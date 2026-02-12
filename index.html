@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty - Multi Stable</title>
+    <title>Nexus Dynasty - Debug Multi</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
-        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #00f2ff; pointer-events: none; }
+        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.8); color: white; padding: 15px; border-radius: 8px; pointer-events: none; border-left: 5px solid #00ff00; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <b>NEXUS DYNASTY</b><br>
-        Statut : <span id="status">Connexion...</span><br>
-        Joueurs en ligne : <span id="pcount">0</span>
+        <b>DEBUG MULTIJOUEUR</b><br>
+        Mon ID : <span id="myid">...</span><br>
+        Joueurs détectés : <span id="pcount">0</span>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -29,73 +29,50 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-sun.position.set(10, 20, 10);
-scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-// --- TERRAIN ---
-function getHeight(x, z) { return Math.sin(x * 0.05) * 2 + Math.cos(z * 0.05) * 2; }
-const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(200, 200, 40, 40),
-    new THREE.MeshStandardMaterial({ color: 0x7cfc00 })
-);
-ground.geometry.attributes.position.array.forEach((v, i) => {
-    if ((i + 1) % 3 === 0) {
-        const x = ground.geometry.attributes.position.array[i-2];
-        const z = ground.geometry.attributes.position.array[i-1];
-        ground.geometry.attributes.position.array[i] = getHeight(x, z);
-    }
-});
-ground.geometry.computeVertexNormals();
+// Sol simple
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(100,100), new THREE.MeshStandardMaterial({color: 0x7cfc00}));
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// --- MULTIJOUEUR ---
 const players = {}; 
 let myId = "";
-let yaw = 0;
-const keys = {};
 
-function createPlayerModel(id, isMe) {
-    const group = new THREE.Group();
-    // On génère une couleur basée sur l'ID pour que chaque joueur soit différent
-    const color = isMe ? 0x00ffff : Math.floor(Math.random() * 0xffffff);
-    const body = new THREE.Mesh(
+function createBox(id, color) {
+    console.log("Création visuelle pour : " + id);
+    const mesh = new THREE.Mesh(
         new THREE.CapsuleGeometry(0.5, 1, 4, 8), 
         new THREE.MeshStandardMaterial({ color: color })
     );
-    body.position.y = 1;
-    group.add(body);
-    
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.3), new THREE.MeshStandardMaterial({color: 0x000000}));
-    head.position.set(0, 1.4, -0.4);
-    group.add(head);
-    
-    scene.add(group);
-    return group;
+    mesh.position.y = 1;
+    scene.add(mesh);
+    return mesh;
 }
 
 socket.on('connect', () => {
     myId = socket.id;
-    document.getElementById('status').innerText = "EN LIGNE";
-    if (!players[myId]) players[myId] = createPlayerModel(myId, true);
+    document.getElementById('myid').innerText = myId;
 });
 
 socket.on('currentPlayers', (data) => {
     Object.keys(data).forEach(id => {
-        if (!players[id]) players[id] = createPlayerModel(id, id === myId);
+        if (!players[id]) {
+            players[id] = createBox(id, id === myId ? 0x00ffff : 0xff0000);
+        }
     });
     document.getElementById('pcount').innerText = Object.keys(data).length;
 });
 
 socket.on('newPlayer', (data) => {
-    if (!players[data.id]) players[data.id] = createPlayerModel(data.id, false);
+    if (!players[data.id]) {
+        players[data.id] = createBox(data.id, 0xff0000);
+    }
     document.getElementById('pcount').innerText = Object.keys(players).length;
 });
 
 socket.on('playerMoved', (data) => {
-    if (players[data.id] && data.id !== myId) {
+    if (players[data.id]) {
         players[data.id].position.set(data.x, data.y, data.z);
         players[data.id].rotation.y = data.ry;
     }
@@ -109,47 +86,31 @@ socket.on('playerDisconnected', (id) => {
     document.getElementById('pcount').innerText = Object.keys(players).length;
 });
 
-// --- CONTROLES ---
+// Contrôles
+const keys = {};
+let yaw = 0;
 document.body.onclick = () => document.body.requestPointerLock();
-document.onmousemove = (e) => {
-    if (document.pointerLockElement === document.body) yaw -= e.movementX * 0.003;
-};
-window.onkeydown = (e) => keys[e.code] = true;
-window.onkeyup = (e) => keys[e.code] = false;
+document.onkeydown = e => keys[e.code] = true;
+document.onkeyup = e => keys[e.code] = false;
+document.onmousemove = e => { if(document.pointerLockElement) yaw -= e.movementX * 0.003; };
 
-let vY = 0;
 function animate() {
     requestAnimationFrame(animate);
-
     if (myId && players[myId]) {
         const me = players[myId];
-        const move = new THREE.Vector3();
-        if (keys['KeyW']) move.z -= 1;
-        if (keys['KeyS']) move.z += 1;
-        if (keys['KeyA']) move.x -= 1;
-        if (keys['KeyD']) move.x += 1;
-
-        if (move.length() > 0) {
-            move.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).normalize().multiplyScalar(0.25);
-            me.position.add(move);
-        }
-
-        vY -= 0.02; // Gravité
-        me.position.y += vY;
-        const h = getHeight(me.position.x, me.position.z);
-        if (me.position.y < h) { me.position.y = h; vY = 0; }
-        if (keys['Space'] && me.position.y <= h + 0.1) vY = 0.4;
-
+        if (keys['KeyW']) me.translateZ(-0.2);
+        if (keys['KeyS']) me.translateZ(0.2);
+        if (keys['KeyA']) me.translateX(-0.2);
+        if (keys['KeyD']) me.translateX(0.2);
         me.rotation.y = yaw;
 
-        // CAMÉRA 3ÈME PERSONNE : Positionnée derrière toi
-        const offset = new THREE.Vector3(0, 3, 6).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+        // CAMERA TPS
+        const offset = new THREE.Vector3(0, 3, 5).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
         camera.position.copy(me.position).add(offset);
-        camera.lookAt(me.position.x, me.position.y + 1, me.position.z);
+        camera.lookAt(me.position);
 
         socket.emit('playerMovement', { x: me.position.x, y: me.position.y, z: me.position.z, ry: me.rotation.y });
     }
-
     renderer.render(scene, camera);
 }
 animate();
