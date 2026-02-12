@@ -1,44 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty : Industrial Era</title>
+    <title>Nexus Dynasty : Industrial AI</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Verdana', sans-serif; }
-        .ui { position: absolute; padding: 15px; background: rgba(0,0,0,0.8); border: 2px solid #00f2ff; border-radius: 10px; color: white; pointer-events: auto; }
-        #stats { top: 10px; left: 10px; display: flex; gap: 15px; font-size: 18px; }
-        #build-menu { bottom: 20px; left: 20px; width: 250px; }
-        #nav { right: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; }
-        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #111; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; }
-        .btn:hover { background: #00f2ff; color: #000; }
-        #login-screen { position: absolute; inset: 0; background: #000; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 10px; margin: 5px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        #ui { position: absolute; inset: 0; pointer-events: none; color: white; }
+        .panel { position: absolute; background: rgba(0,0,0,0.85); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; pointer-events: auto; }
+        
+        /* Barre de Stats */
+        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; font-size: 18px; box-shadow: 0 0 15px rgba(0,242,255,0.2); }
+        
+        /* Menu Action */
+        #menu { bottom: 20px; left: 20px; width: 280px; }
+        .btn { width: 100%; padding: 12px; margin: 5px 0; background: #111; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 10px #00f2ff; }
+
+        /* Login */
+        #login-screen { position: absolute; inset: 0; background: radial-gradient(circle, #001a1a, #000); z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { padding: 12px; margin: 5px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; }
+        
+        .red { color: #ff4444; }
+        .green { color: #55ff55; }
+        .gold { color: #ffd700; }
+        .cyan { color: #00f2ff; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="color:#00f2ff">NEXUS DYNASTY</h1>
+        <h1 style="color:#00f2ff; letter-spacing:8px; text-shadow: 0 0 10px #00f2ff;">NEXUS DYNASTY</h1>
         <input type="text" id="pseudo" placeholder="PSEUDO">
         <input type="password" id="mdp" placeholder="MOT DE PASSE">
-        <button class="btn" onclick="connect()" style="width:200px">ENTRER</button>
+        <button class="btn" onclick="connect()" style="width:200px">REJOINDRE</button>
     </div>
 
-    <div id="stats" class="ui">
-        <span style="color:#ff4444">❤️ <span id="hp">100</span></span>
-        <span style="color:#55ff55">🍞 <span id="food">100</span></span>
-        <span style="color:#ffd700">💰 <span id="gold">0</span></span>
-        <span style="color:#00f2ff">🤖 MINEURS: <span id="workers">0</span></span>
-    </div>
+    <div id="ui">
+        <div id="stats" class="panel">
+            <span class="red">❤️ <span id="hp">100</span></span>
+            <span class="green">🍞 <span id="food">100</span></span>
+            <span class="gold">💰 <span id="gold">0</span></span>
+            <span class="cyan">🤖 <span id="work-count">0</span></span>
+        </div>
 
-    <div id="build-menu" class="ui">
-        <h3 style="margin:0 0 10px 0; color:#00f2ff">CHANTIER INDUSTRIEL</h3>
-        <button class="btn" onclick="buyUnit('worker')">EMBAUCHER MINEUR (100G)</button>
-        <button class="btn" onclick="buyFood()">ACHETER NOURRITURE (20G)</button>
-    </div>
-
-    <div id="nav" class="ui">
-        <button class="btn" onclick="tp('farm')">🌾 FERME</button>
-        <button class="btn" onclick="tp('mine')">⛏️ MINE</button>
+        <div id="menu" class="panel">
+            <button class="btn" onclick="addWorker()">EMBAUCHER MINEUR (100G)</button>
+            <button class="btn" onclick="buyFood()">RAVITAILLEMENT (30G)</button>
+        </div>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -48,8 +55,9 @@
 import * as THREE from 'three';
 
 const socket = io();
-let scene, camera, renderer, player, userStats, ground;
-const workersModels = [];
+let scene, camera, renderer, player, stats;
+const workers = [];
+const ores = [];
 
 window.connect = () => {
     const pseudo = document.getElementById('pseudo').value;
@@ -58,41 +66,68 @@ window.connect = () => {
 };
 
 socket.on('authSuccess', (data) => {
-    userStats = data.user;
+    stats = data;
     document.getElementById('login-screen').style.display = 'none';
     init();
 });
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020205);
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
+    // Lumières
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const light = new THREE.PointLight(0x00f2ff, 2, 50);
-    scene.add(light);
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(10, 20, 10);
+    scene.add(sun);
 
-    // Terrain texturé (Procédural)
+    // --- TEXTURE DE SOL HAUTE QUALITÉ ---
     const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 256;
+    canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#111'; ctx.fillRect(0,0,256,256);
-    ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 2;
-    ctx.strokeRect(0,0,256,256);
+    
+    // Fond vert sombre
+    ctx.fillStyle = '#122412'; ctx.fillRect(0,0,512,512); 
+    
+    // Grille Cyber
+    ctx.strokeStyle = 'rgba(0, 242, 255, 0.2)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0,0,512,512);
+    
+    // Détails d'herbe
+    for(let i=0; i<1500; i++) {
+        ctx.fillStyle = `rgba(0, ${Math.random()*100+40}, 20, 0.4)`;
+        ctx.fillRect(Math.random()*512, Math.random()*512, 3, 3);
+    }
+    
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(100, 100);
+    tex.repeat.set(60, 60);
 
-    ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({map: tex}));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshStandardMaterial({map: tex}));
     ground.rotation.x = -Math.PI/2;
     scene.add(ground);
 
-    player = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
+    // Joueur (Capsule Cyan)
+    player = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.4, 0.8), 
+        new THREE.MeshStandardMaterial({color: 0x00f2ff, emissive: 0x00f2ff, emissiveIntensity: 0.3})
+    );
     player.position.y = 0.8;
     scene.add(player);
+
+    // Création des Minerais (Cibles des mineurs)
+    const oreGeo = new THREE.IcosahedronGeometry(1, 0);
+    const oreMat = new THREE.MeshStandardMaterial({color: 0x333333, roughness: 0.8});
+    for(let i=0; i<20; i++) {
+        const ore = new THREE.Mesh(oreGeo, oreMat);
+        ore.position.set(Math.random()*100-50, 0.5, Math.random()*100-50);
+        scene.add(ore);
+        ores.push(ore);
+    }
 
     const keys = {};
     window.onkeydown = e => keys[e.code] = true;
@@ -100,76 +135,97 @@ function init() {
 
     function animate() {
         requestAnimationFrame(animate);
-        if(userStats.hp > 0) {
-            if(keys['KeyW']) player.position.z -= 0.2;
-            if(keys['KeyS']) player.position.z += 0.2;
-            if(keys['KeyA']) player.position.x -= 0.2;
-            if(keys['KeyD']) player.position.x += 0.2;
-            
-            camera.position.lerp(new THREE.Vector3(player.position.x, 10, player.position.z + 15), 0.1);
-            camera.lookAt(player.position);
-            light.position.copy(player.position);
-            light.position.y = 5;
+        
+        if(stats.hp > 0) {
+            // Déplacement Joueur
+            const s = 0.25;
+            if(keys['KeyW']) player.position.z -= s;
+            if(keys['KeyS']) player.position.z += s;
+            if(keys['KeyA']) player.position.x -= s;
+            if(keys['KeyD']) player.position.x += s;
 
-            // Animation des mineurs
-            workersModels.forEach((w, i) => {
-                w.position.x += Math.sin(Date.now() * 0.001 + i) * 0.05;
-                w.rotation.y += 0.05;
+            // --- IA DES MINEURS ---
+            workers.forEach(w => {
+                if (stats.food > 0) {
+                    // Si plein d'or -> va vers le joueur. Si vide -> va vers le minerai.
+                    const target = w.carrying ? player : w.targetOre;
+                    const dist = w.mesh.position.distanceTo(target.position);
+                    
+                    if (dist > 1.8) {
+                        const dir = new THREE.Vector3().subVectors(target.position, w.mesh.position).normalize();
+                        w.mesh.position.add(dir.multiplyScalar(0.12)); // Vitesse mineur
+                        w.mesh.lookAt(target.position);
+                    } else {
+                        // Contact !
+                        if (w.carrying) {
+                            stats.gold += 25; // Gain d'or
+                            w.carrying = false;
+                            // Change de cible pour le prochain tour
+                            w.targetOre = ores[Math.floor(Math.random()*ores.length)];
+                        } else {
+                            w.carrying = true; // A miné le rocher
+                        }
+                    }
+                    // Animation de flottement
+                    w.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.005) * 0.2;
+                }
             });
         }
+
+        camera.position.lerp(new THREE.Vector3(player.position.x, 15, player.position.z + 20), 0.1);
+        camera.lookAt(player.position);
         renderer.render(scene, camera);
     }
     animate();
 
-    // Boucle Économique (Toutes les secondes)
+    // Boucle de survie
     setInterval(() => {
-        if(userStats.hp > 0) {
-            // Consommation nourriture (Plus de mineurs = plus de faim)
-            let hunger = 0.5 + (userStats.workers * 0.2);
-            userStats.food = Math.max(0, userStats.food - hunger);
+        if(stats.hp > 0) {
+            // Plus de mineurs = plus de consommation de nourriture
+            stats.food = Math.max(0, stats.food - (0.4 + workers.length * 0.15));
             
-            if(userStats.food > 0) {
-                // Production d'or
-                userStats.gold += (userStats.workers * 2);
-            } else {
-                // Si plus de nourriture, les mineurs blessent le joueur (grève !)
-                userStats.hp = Math.max(0, userStats.hp - 1);
-            }
-
+            // Si famine, la vie baisse
+            if(stats.food <= 0) stats.hp = Math.max(0, stats.hp - 2);
+            
             updateUI();
+            socket.emit('updateStats', stats);
         }
     }, 1000);
 }
 
-function updateUI() {
-    document.getElementById('hp').innerText = Math.floor(userStats.hp);
-    document.getElementById('food').innerText = Math.floor(userStats.food);
-    document.getElementById('gold').innerText = Math.floor(userStats.gold);
-    document.getElementById('workers').innerText = userStats.workers;
-}
-
-window.buyUnit = () => {
-    if(userStats.gold >= 100) {
-        userStats.gold -= 100;
-        userStats.workers += 1;
-        const w = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({color: 0xffff00}));
-        w.position.set(player.position.x + (Math.random()*4-2), 0.25, player.position.z + (Math.random()*4-2));
-        scene.add(w);
-        workersModels.push(w);
-        socket.emit('buyWorker');
+window.addWorker = () => {
+    if(stats.gold >= 100) {
+        stats.gold -= 100;
+        const mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(0.6, 0.6, 0.6), 
+            new THREE.MeshStandardMaterial({color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.5})
+        );
+        mesh.position.set(player.position.x, 0.5, player.position.z);
+        scene.add(mesh);
+        
+        workers.push({
+            mesh: mesh,
+            targetOre: ores[Math.floor(Math.random()*ores.length)],
+            carrying: false
+        });
+        updateUI();
     }
 };
 
 window.buyFood = () => {
-    if(userStats.gold >= 20) {
-        userStats.gold -= 20;
-        userStats.food = Math.min(100, userStats.food + 30);
+    if(stats.gold >= 30) {
+        stats.gold -= 30;
+        stats.food = Math.min(100, stats.food + 50);
+        updateUI();
     }
 };
 
-window.tp = (z) => {
-    scene.background = (z === 'mine') ? new THREE.Color(0x050005) : new THREE.Color(0x000500);
-};
+function updateUI() {
+    document.getElementById('hp').innerText = Math.floor(stats.hp);
+    document.getElementById('food').innerText = Math.floor(stats.food);
+    document.getElementById('gold').innerText = stats.gold;
+    document.getElementById('work-count').innerText = workers.length;
+}
 </script>
 </body>
 </html>
