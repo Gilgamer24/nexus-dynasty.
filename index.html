@@ -1,17 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty - Terrain Fix</title>
+    <title>Nexus Dynasty - Empire</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
-        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #00f2ff; pointer-events: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        
+        /* HUD Supérieur */
+        #resources {
+            position: absolute; top: 0; width: 100%; height: 60px;
+            background: rgba(0, 15, 30, 0.85); border-bottom: 2px solid #00f2ff;
+            display: flex; align-items: center; justify-content: center; gap: 30px;
+            color: #00f2ff; z-index: 100; font-weight: bold;
+        }
+
+        /* Menu de Gauche */
+        #ui-left {
+            position: absolute; left: 20px; top: 80px; width: 220px;
+            background: rgba(0, 0, 0, 0.7); border: 1px solid #00f2ff;
+            padding: 15px; color: white; z-index: 100; border-radius: 8px;
+        }
+
+        .btn {
+            width: 100%; padding: 12px; margin: 8px 0;
+            background: #003344; color: #00f2ff; border: 1px solid #00f2ff;
+            cursor: pointer; font-weight: bold; border-radius: 4px;
+        }
+        .btn:hover { background: #00f2ff; color: #000; }
+
+        #notifications {
+            position: absolute; bottom: 20px; left: 20px;
+            color: #00f2ff; font-size: 14px; pointer-events: none;
+        }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <b>NEXUS DYNASTY</b><br>
-        Joueurs : <span id="pcount">1</span>
+
+    <div id="resources">
+        <span>💰 OR: <span id="gold">0</span></span>
+        <span>🌾 NOURRITURE: <span id="food">0</span></span>
+        <span>👥 JOUEURS: <span id="pcount">0</span></span>
     </div>
+
+    <div id="ui-left">
+        <h3 style="margin-top:0">🏛️ ROYAUME</h3>
+        <button class="btn" onclick="buy('mine')">CONSTRUIRE MINE (50G)</button>
+        <button class="btn" onclick="buy('farm')">CONSTRUIRE FERME (50G)</button>
+        <button class="btn" onclick="buy('barracks')">CASERNE (150G)</button>
+        <hr border="0" style="border-top:1px solid #444">
+        <div id="stats">Maison : ...</div>
+    </div>
+
+    <div id="notifications"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
@@ -22,7 +61,7 @@ import * as THREE from 'three';
 const socket = io();
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 10, 100);
+scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -30,98 +69,85 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-sun.position.set(10, 20, 10);
-scene.add(sun);
+const light = new THREE.DirectionalLight(0xffffff, 0.6);
+light.position.set(10, 20, 10);
+scene.add(light);
 
 // --- TERRAIN ---
-// Fonction simplifiée pour éviter les erreurs de calcul
-function getHeight(x, z) {
-    return Math.sin(x * 0.1) * 2 + Math.cos(z * 0.1) * 2;
-}
-
+function getHeight(x, z) { return Math.sin(x * 0.1) * 2 + Math.cos(z * 0.1) * 2; }
 const groundGeo = new THREE.PlaneGeometry(200, 200, 50, 50);
-const vertices = groundGeo.attributes.position.array;
-
-// On déplace chaque point du sol vers le haut selon la fonction getHeight
-for (let i = 0; i < vertices.length; i += 3) {
-    const x = vertices[i];
-    const y = vertices[i + 1]; // Dans PlaneGeo, y est le 2ème axe
-    vertices[i + 2] = getHeight(x, y); // On change le Z (la hauteur)
+const pos = groundGeo.attributes.position;
+for(let i=0; i<pos.count; i++) {
+    pos.setZ(i, getHeight(pos.getX(i), pos.getY(i)));
 }
 groundGeo.computeVertexNormals();
-
-const ground = new THREE.Mesh(
-    groundGeo, 
-    new THREE.MeshStandardMaterial({ color: 0x4CAF50, flatShading: false })
-);
-ground.rotation.x = -Math.PI / 2; // On l'allonge à plat
+const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({color: 0x567d46}));
+ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// --- LOGIQUE JOUEURS ---
+// --- MULTIJOUEUR ---
 const players = {}; 
 let myId = "";
 let yaw = 0;
 const keys = {};
 
-function createPlayerMesh(color) {
+function createModel(data, isMe) {
     const group = new THREE.Group();
-    const body = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.5, 1, 4, 8), 
-        new THREE.MeshStandardMaterial({ color: color })
-    );
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color: data.color}));
     body.position.y = 1;
     group.add(body);
     
-    // Un petit cube pour voir où le perso regarde
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.2), new THREE.MeshStandardMaterial({color: 0x000000}));
-    visor.position.set(0, 1.4, -0.4);
-    group.add(visor);
+    // Visière pour la direction
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.2), new THREE.MeshStandardMaterial({color: 0x000000}));
+    eye.position.set(0, 1.4, -0.4);
+    group.add(eye);
     
     scene.add(group);
     return group;
 }
 
-socket.on('connect', () => { myId = socket.id; });
+socket.on('init', (data) => {
+    myId = data.id;
+    document.getElementById('stats').innerText = data.name;
+});
 
 socket.on('currentPlayers', (data) => {
     Object.keys(data).forEach(id => {
-        if (!players[id]) {
-            players[id] = createPlayerMesh(data[id].color || 0xffffff);
-        }
+        if (!players[id]) players[id] = createModel(data[id], id === myId);
     });
     document.getElementById('pcount').innerText = Object.keys(data).length;
 });
 
-socket.on('newPlayer', (data) => {
-    if (!players[data.id]) {
-        players[data.id] = createPlayerMesh(data.color || 0xffffff);
-    }
-    document.getElementById('pcount').innerText = Object.keys(players).length;
-});
-
 socket.on('playerMoved', (data) => {
-    if (players[data.id] && data.id !== myId) {
+    if (players[data.id]) {
         players[data.id].position.set(data.x, data.y, data.z);
         players[data.id].rotation.y = data.ry;
     }
 });
 
-socket.on('playerDisconnected', (id) => {
-    if (players[id]) { scene.remove(players[id]); delete players[id]; }
-    document.getElementById('pcount').innerText = Object.keys(players).length;
+socket.on('updateResources', (res) => {
+    document.getElementById('gold').innerText = res.gold;
+    document.getElementById('food').innerText = res.food;
 });
 
-// --- INPUTS ---
+socket.on('msg', (text) => {
+    const n = document.getElementById('notifications');
+    n.innerText = text;
+    setTimeout(() => n.innerText = "", 3000);
+});
+
+// --- LOGIQUE ACTIONS ---
+window.buy = (type) => { socket.emit('build', type); };
+
+// --- CONTROLES ---
 document.body.onclick = () => document.body.requestPointerLock();
-document.onmousemove = e => { if (document.pointerLockElement) yaw -= e.movementX * 0.003; };
-window.onkeydown = e => keys[e.code] = true;
-window.onkeyup = e => keys[e.code] = false;
+document.onmousemove = (e) => { if(document.pointerLockElement) yaw -= e.movementX * 0.003; };
+window.onkeydown = (e) => keys[e.code] = true;
+window.onkeyup = (e) => keys[e.code] = false;
 
 let vY = 0;
 function animate() {
     requestAnimationFrame(animate);
-
     if (myId && players[myId]) {
         const me = players[myId];
         const move = new THREE.Vector3();
@@ -135,26 +161,19 @@ function animate() {
             me.position.add(move);
         }
 
-        // Physique simple
-        vY -= 0.02; 
-        me.position.y += vY;
-        const currentH = getHeight(me.position.x, me.position.z);
-        if (me.position.y < currentH) { 
-            me.position.y = currentH; 
-            vY = 0; 
-        }
-        if (keys['Space'] && me.position.y <= currentH + 0.1) vY = 0.4;
-
+        vY -= 0.02; me.position.y += vY;
+        const h = getHeight(me.position.x, me.position.z);
+        if (me.position.y < h) { me.position.y = h; vY = 0; }
+        if (keys['Space'] && me.position.y <= h + 0.1) vY = 0.4;
         me.rotation.y = yaw;
 
-        // Caméra 3ème personne
-        const camOffset = new THREE.Vector3(0, 3, 6).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        camera.position.copy(me.position).add(camOffset);
+        // Caméra 3ème Personne
+        const offset = new THREE.Vector3(0, 3, 6).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+        camera.position.copy(me.position).add(offset);
         camera.lookAt(me.position.x, me.position.y + 1, me.position.z);
 
         socket.emit('playerMovement', { x: me.position.x, y: me.position.y, z: me.position.z, ry: me.rotation.y });
     }
-
     renderer.render(scene, camera);
 }
 animate();
