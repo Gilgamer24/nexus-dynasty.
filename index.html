@@ -1,36 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty - Empire</title>
+    <title>Nexus Dynasty - Builders Edition</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
-        
-        /* HUD Supérieur */
         #resources {
             position: absolute; top: 0; width: 100%; height: 60px;
-            background: rgba(0, 15, 30, 0.85); border-bottom: 2px solid #00f2ff;
+            background: rgba(0, 15, 30, 0.9); border-bottom: 2px solid #00f2ff;
             display: flex; align-items: center; justify-content: center; gap: 30px;
-            color: #00f2ff; z-index: 100; font-weight: bold;
+            color: #00f2ff; z-index: 100; font-weight: bold; font-size: 1.2em;
         }
-
-        /* Menu de Gauche */
         #ui-left {
             position: absolute; left: 20px; top: 80px; width: 220px;
-            background: rgba(0, 0, 0, 0.7); border: 1px solid #00f2ff;
+            background: rgba(0, 0, 0, 0.8); border: 1px solid #00f2ff;
             padding: 15px; color: white; z-index: 100; border-radius: 8px;
         }
-
         .btn {
             width: 100%; padding: 12px; margin: 8px 0;
             background: #003344; color: #00f2ff; border: 1px solid #00f2ff;
             cursor: pointer; font-weight: bold; border-radius: 4px;
         }
         .btn:hover { background: #00f2ff; color: #000; }
-
-        #notifications {
-            position: absolute; bottom: 20px; left: 20px;
-            color: #00f2ff; font-size: 14px; pointer-events: none;
-        }
+        #notifications { position: absolute; bottom: 20px; left: 20px; color: #00f2ff; z-index: 100; background: rgba(0,0,0,0.5); padding: 5px; }
     </style>
 </head>
 <body>
@@ -42,12 +33,11 @@
     </div>
 
     <div id="ui-left">
-        <h3 style="margin-top:0">🏛️ ROYAUME</h3>
-        <button class="btn" onclick="buy('mine')">CONSTRUIRE MINE (50G)</button>
-        <button class="btn" onclick="buy('farm')">CONSTRUIRE FERME (50G)</button>
+        <h3 style="margin-top:0">🏗️ CHANTIER</h3>
+        <button class="btn" onclick="buy('mine')">MINE (50G)</button>
+        <button class="btn" onclick="buy('farm')">FERME (50G)</button>
         <button class="btn" onclick="buy('barracks')">CASERNE (150G)</button>
-        <hr border="0" style="border-top:1px solid #444">
-        <div id="stats">Maison : ...</div>
+        <div id="stats" style="color:#00f2ff; margin-top:10px">Maison : ...</div>
     </div>
 
     <div id="notifications"></div>
@@ -61,7 +51,7 @@ import * as THREE from 'three';
 const socket = io();
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -69,109 +59,155 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-const light = new THREE.DirectionalLight(0xffffff, 0.6);
-light.position.set(10, 20, 10);
-scene.add(light);
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(50, 100, 50);
+scene.add(sun);
 
-// --- TERRAIN ---
-function getHeight(x, z) { return Math.sin(x * 0.1) * 2 + Math.cos(z * 0.1) * 2; }
-const groundGeo = new THREE.PlaneGeometry(200, 200, 50, 50);
-const pos = groundGeo.attributes.position;
-for(let i=0; i<pos.count; i++) {
-    pos.setZ(i, getHeight(pos.getX(i), pos.getY(i)));
+// --- MODÈLES ---
+function createBuildingModel(type, isGhost = false) {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ 
+        color: type === 'mine' ? 0x777777 : (type === 'farm' ? 0x8B4513 : 0x2F4F4F),
+        transparent: isGhost,
+        opacity: isGhost ? 0.4 : 1.0
+    });
+
+    if (type === 'mine') {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1, 1.5), mat);
+        b.position.y = 0.5; group.add(b);
+    } else if (type === 'farm') {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 1.2), mat);
+        const r = new THREE.Mesh(new THREE.ConeGeometry(1, 0.8, 4), new THREE.MeshStandardMaterial({color: 0xff4444, transparent: isGhost, opacity: isGhost?0.4:1}));
+        r.position.y = 1.2; r.rotation.y = Math.PI/4;
+        group.add(b, r);
+    } else {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(2, 1.5, 2), mat);
+        b.position.y = 0.75; group.add(b);
+    }
+    return group;
 }
+
+function createWorker() {
+    const worker = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.4), new THREE.MeshStandardMaterial({color: 0xffff00}));
+    body.position.y = 0.3;
+    worker.add(body);
+    return worker;
+}
+
+// --- TERRAIN PLAT ---
+function getHeight(x, z) { return Math.sin(x * 0.05) * 0.5 + Math.cos(z * 0.05) * 0.5; }
+const groundGeo = new THREE.PlaneGeometry(500, 500, 50, 50);
+const pos = groundGeo.attributes.position;
+for(let i=0; i<pos.count; i++) { pos.setZ(i, getHeight(pos.getX(i), pos.getY(i))); }
 groundGeo.computeVertexNormals();
-const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({color: 0x567d46}));
+const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({color: 0x66cc66}));
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// --- MULTIJOUEUR ---
+// --- LOGIQUE ---
 const players = {}; 
+const builders = [];
 let myId = "";
 let yaw = 0;
 const keys = {};
 
-function createModel(data, isMe) {
-    const group = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color: data.color}));
-    body.position.y = 1;
-    group.add(body);
-    
-    // Visière pour la direction
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.2), new THREE.MeshStandardMaterial({color: 0x000000}));
-    eye.position.set(0, 1.4, -0.4);
-    group.add(eye);
-    
-    scene.add(group);
-    return group;
-}
-
-socket.on('init', (data) => {
-    myId = data.id;
-    document.getElementById('stats').innerText = data.name;
-});
+socket.on('init', (data) => { myId = data.id; document.getElementById('stats').innerText = data.name; });
 
 socket.on('currentPlayers', (data) => {
     Object.keys(data).forEach(id => {
-        if (!players[id]) players[id] = createModel(data[id], id === myId);
+        if (!players[id]) {
+            const p = new THREE.Group();
+            const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color: data[id].color}));
+            b.position.y = 1; p.add(b);
+            players[id] = p; scene.add(p);
+        }
     });
     document.getElementById('pcount').innerText = Object.keys(data).length;
 });
 
-socket.on('playerMoved', (data) => {
-    if (players[data.id]) {
-        players[data.id].position.set(data.x, data.y, data.z);
-        players[data.id].rotation.y = data.ry;
-    }
-});
-
-socket.on('updateResources', (res) => {
-    document.getElementById('gold').innerText = res.gold;
-    document.getElementById('food').innerText = res.food;
-});
+socket.on('playerMoved', (data) => { if (players[data.id]) { players[data.id].position.set(data.x, data.y, data.z); players[data.id].rotation.y = data.ry; } });
+socket.on('updateResources', (res) => { document.getElementById('gold').innerText = Math.floor(res.gold); document.getElementById('food').innerText = Math.floor(res.food); });
 
 socket.on('msg', (text) => {
     const n = document.getElementById('notifications');
-    n.innerText = text;
-    setTimeout(() => n.innerText = "", 3000);
+    n.innerText = "📢 " + text;
+    if(text.includes("Construction réussie")) {
+        const type = text.split(":")[1].trim().split(" ")[0];
+        startBuildSequence(type);
+    }
 });
 
-// --- LOGIQUE ACTIONS ---
+function startBuildSequence(type) {
+    const me = players[myId];
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 5;
+    const targetX = me.position.x + Math.cos(angle) * dist;
+    const targetZ = me.position.z + Math.sin(angle) * dist;
+
+    // 1. Apparition du fantôme de bâtiment
+    const ghost = createBuildingModel(type, true);
+    ghost.position.set(targetX, getHeight(targetX, targetZ), targetZ);
+    scene.add(ghost);
+
+    // 2. Apparition de l'ouvrier
+    const worker = createWorker();
+    worker.position.copy(me.position);
+    scene.add(worker);
+
+    builders.push({ worker, ghost, target: new THREE.Vector3(targetX, 0, targetZ), type, startTime: Date.now(), state: 'moving' });
+}
+
 window.buy = (type) => { socket.emit('build', type); };
-
-// --- CONTROLES ---
 document.body.onclick = () => document.body.requestPointerLock();
-document.onmousemove = (e) => { if(document.pointerLockElement) yaw -= e.movementX * 0.003; };
-window.onkeydown = (e) => keys[e.code] = true;
-window.onkeyup = (e) => keys[e.code] = false;
+document.onmousemove = e => { if(document.pointerLockElement) yaw -= e.movementX * 0.003; };
+window.onkeydown = e => keys[e.code] = true;
+window.onkeyup = e => keys[e.code] = false;
 
-let vY = 0;
 function animate() {
     requestAnimationFrame(animate);
+    
+    // Animation des ouvriers
+    const now = Date.now();
+    for(let i = builders.length - 1; i >= 0; i--) {
+        const b = builders[i];
+        if(b.state === 'moving') {
+            const dir = new THREE.Vector3().subVectors(b.target, b.worker.position);
+            dir.y = 0;
+            if(dir.length() > 0.2) {
+                dir.normalize().multiplyScalar(0.05);
+                b.worker.position.add(dir);
+                b.worker.position.y = getHeight(b.worker.position.x, b.worker.position.z);
+            } else {
+                b.state = 'building';
+                b.buildStart = now;
+            }
+        } else if (b.state === 'building') {
+            b.worker.rotation.y += 0.2; // L'ouvrier "travaille" (tourne)
+            if(now - b.buildStart > 4000) { // 4 secondes de construction
+                scene.remove(b.ghost);
+                const final = createBuildingModel(b.type, false);
+                final.position.copy(b.ghost.position);
+                scene.add(final);
+                scene.remove(b.worker);
+                builders.splice(i, 1);
+            }
+        }
+    }
+
     if (myId && players[myId]) {
         const me = players[myId];
         const move = new THREE.Vector3();
-        if (keys['KeyW']) move.z -= 1;
-        if (keys['KeyS']) move.z += 1;
-        if (keys['KeyA']) move.x -= 1;
-        if (keys['KeyD']) move.x += 1;
-
+        if (keys['KeyW']) move.z -= 1; if (keys['KeyS']) move.z += 1;
+        if (keys['KeyA']) move.x -= 1; if (keys['KeyD']) move.x += 1;
         if (move.length() > 0) {
             move.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).normalize().multiplyScalar(0.2);
             me.position.add(move);
         }
-
-        vY -= 0.02; me.position.y += vY;
-        const h = getHeight(me.position.x, me.position.z);
-        if (me.position.y < h) { me.position.y = h; vY = 0; }
-        if (keys['Space'] && me.position.y <= h + 0.1) vY = 0.4;
+        me.position.y = getHeight(me.position.x, me.position.z);
         me.rotation.y = yaw;
-
-        // Caméra 3ème Personne
-        const offset = new THREE.Vector3(0, 3, 6).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        camera.position.copy(me.position).add(offset);
+        camera.position.copy(me.position).add(new THREE.Vector3(0, 6, 12).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
         camera.lookAt(me.position.x, me.position.y + 1, me.position.z);
-
         socket.emit('playerMovement', { x: me.position.x, y: me.position.y, z: me.position.z, ry: me.rotation.y });
     }
     renderer.render(scene, camera);
