@@ -1,33 +1,34 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty : Economy</title>
+    <title>Nexus Dynastie : Ultra Texture</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial', sans-serif; }
-        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; color: white; padding: 15px; pointer-events: auto; border-radius: 10px; }
-        #top-bar { top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 30px; border-radius: 40px; }
-        #build-menu { bottom: 20px; left: 20px; width: 200px; }
-        .stat { font-weight: bold; font-size: 18px; }
-        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #004466; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; border-radius: 5px; }
-        .btn:hover { background: #00f2ff; color: #000; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        #login-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: radial-gradient(circle, #111, #000); color: white; }
+        input { padding: 12px; margin: 5px; border-radius: 8px; border: 1px solid #00f2ff; background: #111; color: white; width: 260px; }
+        .btn { padding: 10px 25px; background: #00f2ff; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #nav { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; }
+        .zone-btn { width: 60px; height: 60px; border-radius: 12px; border: 2px solid #00f2ff; background: rgba(0,0,0,0.6); color: white; font-size: 24px; cursor: pointer; transition: 0.3s; }
+        .zone-btn:hover { box-shadow: 0 0 15px #00f2ff; transform: scale(1.1); }
+        #stats { position: absolute; top: 20px; left: 20px; color: #00f2ff; font-size: 20px; font-weight: bold; text-shadow: 0 0 5px #000; }
     </style>
 </head>
 <body>
 
-<div id="ui">
-    <div id="top-bar" class="panel">
-        <div class="stat">❤️ VIE: <span id="hp">100</span></div>
-        <div class="stat">🍞 FAIM: <span id="food">100</span></div>
-        <div class="stat">💰 OR: <span id="gold">0</span></div>
+    <div id="login-screen">
+        <h1 style="color:#00f2ff; text-shadow: 0 0 10px #00f2ff;">NEXUS DYNASTIE</h1>
+        <input type="text" id="pseudo" placeholder="Pseudo">
+        <input type="password" id="mdp" placeholder="Mot de passe">
+        <button class="btn" onclick="connect()">SE CONNECTER</button>
     </div>
 
-    <div id="build-menu" class="panel">
-        <h3 style="margin:0 0 10px 0">CONSTRUCTION</h3>
-        <button class="btn" onclick="socket.emit('requestBuild', 'farm')">FERME (50G)</button>
-        <button class="btn" onclick="socket.emit('requestBuild', 'mine')">MINE (80G)</button>
+    <div id="stats">💰 <span id="gold">1000</span></div>
+
+    <div id="nav">
+        <button class="zone-btn" onclick="go('farm')">🌳</button>
+        <button class="zone-btn" onclick="go('adventure')">⛏️</button>
+        <button class="zone-btn" onclick="go('pvp')">⚔️</button>
     </div>
-</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
@@ -35,121 +36,115 @@
 <script type="module">
 import * as THREE from 'three';
 
-const pseudo = prompt("Ton Pseudo de Souverain :", "Joueur_" + Math.floor(Math.random()*999));
 const socket = io();
+let scene, camera, renderer, player, ground;
+const textures = {};
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+// --- GÉNÉRATEUR DE TEXTURES (SANS IMAGES EXTERNES) ---
+function generateTextures() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 256;
+    const ctx = canvas.getContext('2d');
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.position.set(20, 50, 20);
-scene.add(sun);
-
-// --- MODELS 3D ---
-function createPlayerModel(color) {
-    const group = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.4), new THREE.MeshStandardMaterial({color}));
-    body.position.y = 0.5;
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshStandardMaterial({color: 0xffdbac}));
-    head.position.y = 1.2;
-    group.add(body, head);
-    return group;
-}
-
-function createBuildingModel(type) {
-    const group = new THREE.Group();
-    if(type === 'farm') {
-        const base = new THREE.Mesh(new THREE.BoxGeometry(2, 1, 2), new THREE.MeshStandardMaterial({color: 0x8B4513}));
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1, 4), new THREE.MeshStandardMaterial({color: 0xff0000}));
-        roof.position.y = 1; roof.rotation.y = Math.PI/4;
-        group.add(base, roof);
-    } else {
-        const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1, 2), new THREE.MeshStandardMaterial({color: 0x444444}));
-        tower.position.y = 1;
-        group.add(tower);
+    // Texture Brique (pour aventure/pvp)
+    ctx.fillStyle = '#444'; ctx.fillRect(0,0,256,256);
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 4;
+    for(let i=0; i<8; i++) {
+        for(let j=0; j<8; j++) {
+            ctx.strokeRect(i*32 + (j%2*16), j*32, 32, 32);
+        }
     }
-    return group;
-}
+    textures.brick = new THREE.CanvasTexture(canvas.cloneNode(true));
+    textures.brick.wrapS = textures.brick.wrapT = THREE.RepeatWrapping;
+    textures.brick.repeat.set(1, 1);
 
-// --- MONDE & ZONES ---
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({color: 0x333333}));
-ground.rotation.x = -Math.PI/2;
-scene.add(ground);
-
-const peaceZone = new THREE.Mesh(new THREE.CircleGeometry(40, 32), new THREE.MeshStandardMaterial({color: 0x44aa44}));
-peaceZone.rotation.x = -Math.PI/2; peaceZone.position.y = 0.01;
-scene.add(peaceZone);
-
-// --- LOGIQUE MULTI ---
-let myId;
-const players = {};
-const buildings = {};
-
-socket.emit('join', { pseudo });
-
-socket.on('init', (data) => {
-    myId = data.id;
-    Object.keys(data.players).forEach(id => {
-        players[id] = createPlayerModel(data.players[id].color);
-        scene.add(players[id]);
-    });
-    data.buildings.forEach(b => spawnBuilding(b));
-});
-
-socket.on('newPlayer', d => {
-    players[d.id] = createPlayerModel(d.color);
-    scene.add(players[d.id]);
-});
-
-socket.on('playerMoved', d => { if(players[d.id]) players[d.id].position.set(d.x, d.y, d.z); });
-
-socket.on('updateStats', d => {
-    document.getElementById('hp').innerText = d.hp || 100;
-    document.getElementById('gold').innerText = d.gold;
-    document.getElementById('food').innerText = d.food;
-});
-
-socket.on('buildingPlaced', b => spawnBuilding(b));
-
-function spawnBuilding(b) {
-    const model = createBuildingModel(b.type);
-    model.position.set(b.x, 0, b.z);
-    scene.add(model);
-}
-
-// --- CONTROLES ---
-let yaw = 0;
-const keys = {};
-renderer.domElement.onclick = () => renderer.domElement.requestPointerLock();
-document.onmousemove = e => { if(document.pointerLockElement) yaw -= e.movementX * 0.003; };
-window.onkeydown = e => keys[e.code] = true;
-window.onkeyup = e => keys[e.code] = false;
-
-function animate() {
-    requestAnimationFrame(animate);
-    if(players[myId]) {
-        const me = players[myId];
-        const move = new THREE.Vector3();
-        if(keys['KeyW']) move.z -= 0.15; if(keys['KeyS']) move.z += 0.15;
-        if(keys['KeyA']) move.x -= 0.15; if(keys['KeyD']) move.x += 0.15;
-        move.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        me.position.add(move);
-        me.rotation.y = yaw;
-        
-        camera.position.copy(me.position).add(new THREE.Vector3(0, 8, 15).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
-        camera.lookAt(me.position);
-        socket.emit('move', { x: me.position.x, y: me.position.y, z: me.position.z, ry: me.rotation.y });
+    // Texture Herbe (pour farm)
+    ctx.fillStyle = '#1a3c1a'; ctx.fillRect(0,0,256,256);
+    for(let i=0; i<500; i++) {
+        ctx.fillStyle = `rgb(0, ${Math.random()*100 + 50}, 0)`;
+        ctx.fillRect(Math.random()*256, Math.random()*256, 2, 2);
     }
-    renderer.render(scene, camera);
+    textures.grass = new THREE.CanvasTexture(canvas);
+    textures.grass.wrapS = textures.grass.wrapT = THREE.RepeatWrapping;
 }
-animate();
 
-window.socket = socket; // Pour les onclick
+window.connect = () => {
+    const pseudo = document.getElementById('pseudo').value;
+    const mdp = document.getElementById('mdp').value;
+    if(pseudo && mdp) socket.emit('login', { pseudo, mdp });
+};
+
+socket.on('authSuccess', (data) => {
+    document.getElementById('login-screen').style.display = 'none';
+    generateTextures();
+    init();
+});
+
+function init() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // Lumières
+    const amb = new THREE.AmbientLight(0xffffff, 0.4);
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(10, 20, 10);
+    sun.castShadow = true;
+    scene.add(amb, sun);
+
+    // Sol avec texture
+    const groundGeo = new THREE.PlaneGeometry(1000, 1000);
+    const groundMat = new THREE.MeshStandardMaterial({ map: textures.grass });
+    ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI/2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Joueur stylé
+    player = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({ color: 0x00f2ff, emissive: 0x00f2ff, emissiveIntensity: 0.2 }));
+    body.position.y = 0.8;
+    body.castShadow = true;
+    player.add(body);
+    scene.add(player);
+
+    const keys = {};
+    window.onkeydown = e => keys[e.code] = true;
+    window.onkeyup = e => keys[e.code] = false;
+
+    window.go = (zone) => {
+        if(zone === 'adventure') {
+            ground.material.map = textures.brick;
+            ground.material.color.set(0x555555);
+            // Rajouter des murs
+            for(let i=0; i<10; i++) {
+                const wall = new THREE.Mesh(new THREE.BoxGeometry(2,4,2), new THREE.MeshStandardMaterial({map: textures.brick}));
+                wall.position.set(Math.random()*40-20, 2, Math.random()*40-20);
+                scene.add(wall);
+            }
+        } else {
+            ground.material.map = textures.grass;
+            ground.material.color.set(0xffffff);
+        }
+    };
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const speed = 0.15;
+        if(keys['KeyW']) player.position.z -= speed;
+        if(keys['KeyS']) player.position.z += speed;
+        if(keys['KeyA']) player.position.x -= speed;
+        if(keys['KeyD']) player.position.x += speed;
+
+        camera.position.lerp(new THREE.Vector3(player.position.x, 8, player.position.z + 12), 0.1);
+        camera.lookAt(player.position);
+        renderer.render(scene, camera);
+    }
+    animate();
+}
 </script>
 </body>
 </html>
