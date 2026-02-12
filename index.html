@@ -1,59 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty : Master Builder</title>
+    <title>Nexus Dynasty : Industrial Era</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial', sans-serif; }
-        #ui { position: absolute; inset: 0; pointer-events: none; color: white; }
-        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; pointer-events: auto; }
-        
-        /* Stats */
-        #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; font-size: 20px; }
-        
-        /* Menu Construction */
-        #build-menu { bottom: 20px; left: 20px; width: 220px; }
-        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #004466; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn:hover { background: #00f2ff; color: #000; }
-
-        /* Login & Death */
-        #overlay { position: absolute; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 12px; margin: 5px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; }
-        
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Verdana', sans-serif; }
+        .ui { position: absolute; padding: 15px; background: rgba(0,0,0,0.8); border: 2px solid #00f2ff; border-radius: 10px; color: white; pointer-events: auto; }
+        #stats { top: 10px; left: 10px; display: flex; gap: 15px; font-size: 18px; }
+        #build-menu { bottom: 20px; left: 20px; width: 250px; }
         #nav { right: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; }
+        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #111; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; }
+        .btn:hover { background: #00f2ff; color: #000; }
+        #login-screen { position: absolute; inset: 0; background: #000; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { padding: 10px; margin: 5px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; }
     </style>
 </head>
 <body>
 
-    <div id="overlay">
-        <h1 style="color:#00f2ff; letter-spacing: 5px;">NEXUS DYNASTY</h1>
+    <div id="login-screen">
+        <h1 style="color:#00f2ff">NEXUS DYNASTY</h1>
         <input type="text" id="pseudo" placeholder="PSEUDO">
         <input type="password" id="mdp" placeholder="MOT DE PASSE">
-        <button class="btn" onclick="connect()" style="width:200px">REJOINDRE</button>
+        <button class="btn" onclick="connect()" style="width:200px">ENTRER</button>
     </div>
 
-    <div id="death-screen" style="display:none; position:absolute; inset:0; background:rgba(150,0,0,0.9); z-index:2000; flex-direction:column; align-items:center; justify-content:center; color:white;">
-        <h1 style="font-size:60px">GAME OVER</h1>
-        <p>Tu as perdu 40% de ton or.</p>
-        <button class="btn" onclick="respawn()" style="width:200px">RESPAWN</button>
+    <div id="stats" class="ui">
+        <span style="color:#ff4444">❤️ <span id="hp">100</span></span>
+        <span style="color:#55ff55">🍞 <span id="food">100</span></span>
+        <span style="color:#ffd700">💰 <span id="gold">0</span></span>
+        <span style="color:#00f2ff">🤖 MINEURS: <span id="workers">0</span></span>
     </div>
 
-    <div id="ui">
-        <div id="stats" class="panel">
-            <span style="color:#ff4444">❤️ <span id="hp-val">100</span></span>
-            <span style="color:#ffd700">💰 <span id="gold-val">1000</span></span>
-        </div>
+    <div id="build-menu" class="ui">
+        <h3 style="margin:0 0 10px 0; color:#00f2ff">CHANTIER INDUSTRIEL</h3>
+        <button class="btn" onclick="buyUnit('worker')">EMBAUCHER MINEUR (100G)</button>
+        <button class="btn" onclick="buyFood()">ACHETER NOURRITURE (20G)</button>
+    </div>
 
-        <div id="build-menu" class="panel">
-            <h3 style="margin-top:0">🔨 CHANTIER</h3>
-            <button class="btn" onclick="requestBuild('mine', 50)">MINE (50G)</button>
-            <button class="btn" onclick="requestBuild('ferme', 50)">FERME (50G)</button>
-            <button class="btn" onclick="requestBuild('caserne', 150)">CASERNE (150G)</button>
-        </div>
-
-        <div id="nav">
-            <button class="btn" style="border-radius:50%; width:60px; height:60px" onclick="tp('farm')">🌳</button>
-            <button class="btn" style="border-radius:50%; width:60px; height:60px" onclick="tp('adventure')">⛏️</button>
-        </div>
+    <div id="nav" class="ui">
+        <button class="btn" onclick="tp('farm')">🌾 FERME</button>
+        <button class="btn" onclick="tp('mine')">⛏️ MINE</button>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -63,25 +48,8 @@
 import * as THREE from 'three';
 
 const socket = io();
-let scene, camera, renderer, player, stats, ground;
-const otherPlayers = {};
-const buildings = [];
-
-// --- TEXTURE GÉNÉRÉE ---
-function getGrassTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1a3c1a'; ctx.fillRect(0,0,512,512);
-    for(let i=0; i<20000; i++) {
-        ctx.fillStyle = `rgb(0, ${Math.random()*80 + 40}, 0)`;
-        ctx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(100, 100);
-    return tex;
-}
+let scene, camera, renderer, player, userStats, ground;
+const workersModels = [];
 
 window.connect = () => {
     const pseudo = document.getElementById('pseudo').value;
@@ -90,35 +58,40 @@ window.connect = () => {
 };
 
 socket.on('authSuccess', (data) => {
-    stats = data.user;
-    document.getElementById('overlay').style.display = 'none';
+    userStats = data.user;
+    document.getElementById('login-screen').style.display = 'none';
     init();
-    data.buildings.forEach(b => spawnBuilding(b));
 });
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB);
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
+    scene.background = new THREE.Color(0x020205);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const amb = new THREE.AmbientLight(0xffffff, 0.6);
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-    sun.position.set(50, 100, 50);
-    scene.add(amb, sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const light = new THREE.PointLight(0x00f2ff, 2, 50);
+    scene.add(light);
 
-    // TERRAIN TEXTURÉ
-    const groundGeo = new THREE.PlaneGeometry(2000, 2000);
-    const groundMat = new THREE.MeshStandardMaterial({ map: getGrassTexture() });
-    ground = new THREE.Mesh(groundGeo, groundMat);
+    // Terrain texturé (Procédural)
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#111'; ctx.fillRect(0,0,256,256);
+    ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 2;
+    ctx.strokeRect(0,0,256,256);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(100, 100);
+
+    ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({map: tex}));
     ground.rotation.x = -Math.PI/2;
     scene.add(ground);
 
-    // JOUEUR
-    player = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
-    player.position.y = 1;
+    player = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
+    player.position.y = 0.8;
     scene.add(player);
 
     const keys = {};
@@ -127,77 +100,76 @@ function init() {
 
     function animate() {
         requestAnimationFrame(animate);
-        if(stats.hp > 0) {
-            const speed = 0.2;
-            if(keys['KeyW']) player.position.z -= speed;
-            if(keys['KeyS']) player.position.z += speed;
-            if(keys['KeyA']) player.position.x -= speed;
-            if(keys['KeyD']) player.position.x += speed;
-
+        if(userStats.hp > 0) {
+            if(keys['KeyW']) player.position.z -= 0.2;
+            if(keys['KeyS']) player.position.z += 0.2;
+            if(keys['KeyA']) player.position.x -= 0.2;
+            if(keys['KeyD']) player.position.x += 0.2;
+            
             camera.position.lerp(new THREE.Vector3(player.position.x, 10, player.position.z + 15), 0.1);
             camera.lookAt(player.position);
-            socket.emit('move', player.position);
+            light.position.copy(player.position);
+            light.position.y = 5;
+
+            // Animation des mineurs
+            workersModels.forEach((w, i) => {
+                w.position.x += Math.sin(Date.now() * 0.001 + i) * 0.05;
+                w.rotation.y += 0.05;
+            });
         }
         renderer.render(scene, camera);
     }
     animate();
 
-    // Survie
+    // Boucle Économique (Toutes les secondes)
     setInterval(() => {
-        if(stats.hp > 0) {
-            stats.hp -= 0.2; // Faim naturelle
-            if(stats.hp <= 0) document.getElementById('death-screen').style.display = 'flex';
-            document.getElementById('hp-val').innerText = Math.floor(stats.hp);
-            document.getElementById('gold-val').innerText = stats.gold;
-            socket.emit('updateStats', stats);
+        if(userStats.hp > 0) {
+            // Consommation nourriture (Plus de mineurs = plus de faim)
+            let hunger = 0.5 + (userStats.workers * 0.2);
+            userStats.food = Math.max(0, userStats.food - hunger);
+            
+            if(userStats.food > 0) {
+                // Production d'or
+                userStats.gold += (userStats.workers * 2);
+            } else {
+                // Si plus de nourriture, les mineurs blessent le joueur (grève !)
+                userStats.hp = Math.max(0, userStats.hp - 1);
+            }
+
+            updateUI();
         }
     }, 1000);
 }
 
-// --- ACTIONS ---
-window.requestBuild = (type, cost) => {
-    if(stats.gold >= cost) {
-        socket.emit('build', { type, cost, x: player.position.x, z: player.position.z - 3 });
-    } else {
-        alert("Or insuffisant !");
-    }
-};
-
-socket.on('newBuilding', (b) => spawnBuilding(b));
-socket.on('updateGold', (g) => stats.gold = g);
-
-function spawnBuilding(b) {
-    let color = 0x8B4513; // Ferme
-    if(b.type === 'mine') color = 0x444444;
-    if(b.type === 'caserne') color = 0x111111;
-    
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), new THREE.MeshStandardMaterial({color}));
-    mesh.position.set(b.x, 1.5, b.z);
-    scene.add(mesh);
+function updateUI() {
+    document.getElementById('hp').innerText = Math.floor(userStats.hp);
+    document.getElementById('food').innerText = Math.floor(userStats.food);
+    document.getElementById('gold').innerText = Math.floor(userStats.gold);
+    document.getElementById('workers').innerText = userStats.workers;
 }
 
-window.respawn = () => {
-    socket.emit('requestRespawn');
+window.buyUnit = () => {
+    if(userStats.gold >= 100) {
+        userStats.gold -= 100;
+        userStats.workers += 1;
+        const w = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({color: 0xffff00}));
+        w.position.set(player.position.x + (Math.random()*4-2), 0.25, player.position.z + (Math.random()*4-2));
+        scene.add(w);
+        workersModels.push(w);
+        socket.emit('buyWorker');
+    }
 };
 
-socket.on('respawnDone', (u) => {
-    stats = u;
-    player.position.set(0, 1, 0);
-    document.getElementById('death-screen').style.display = 'none';
-});
-
-socket.on('pMoved', d => {
-    if(!otherPlayers[d.id]) {
-        otherPlayers[d.id] = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshBasicMaterial({color: 0xff00ff}));
-        scene.add(otherPlayers[d.id]);
+window.buyFood = () => {
+    if(userStats.gold >= 20) {
+        userStats.gold -= 20;
+        userStats.food = Math.min(100, userStats.food + 30);
     }
-    otherPlayers[d.id].position.copy(d.pos);
-});
+};
 
 window.tp = (z) => {
-    if(z === 'adventure') scene.background = new THREE.Color(0x050510);
-    else scene.background = new THREE.Color(0x87CEEB);
-}
+    scene.background = (z === 'mine') ? new THREE.Color(0x050005) : new THREE.Color(0x000500);
+};
 </script>
 </body>
 </html>
