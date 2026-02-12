@@ -2,47 +2,47 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
+const fs = require('fs');
 
 app.use(express.static(__dirname));
 
-let players = {}; 
+// --- GESTION DE LA BASE DE DONNÉES ---
 let db = { users: {} };
+const DB_PATH = './database.json';
+
+if (fs.existsSync(DB_PATH)) {
+    try {
+        db = JSON.parse(fs.readFileSync(DB_PATH));
+        console.log("Données chargées avec succès.");
+    } catch (e) {
+        console.error("Erreur de lecture DB, reset en cours.");
+    }
+}
+
+function saveDB() {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+}
 
 io.on('connection', (socket) => {
     socket.on('login', (data) => {
-        const { pseudo } = data;
-        // Création ou chargement du profil
+        const pseudo = data.pseudo;
         if (!db.users[pseudo]) {
             db.users[pseudo] = { 
-                pseudo, gold: 100, food: 100, hp: 100, oreStock: 0, houses: [] 
+                pseudo, gold: 200, food: 100, hp: 100, oreStock: 0, houses: [] 
             };
+            saveDB();
         }
         socket.userId = pseudo;
-        players[socket.id] = { id: socket.id, pseudo: pseudo, x: 0, z: 0 };
-        
-        // Envoi des données au joueur
-        socket.emit('authSuccess', { me: db.users[pseudo], allPlayers: players });
-        // Informe les autres de l'arrivée du joueur
-        socket.broadcast.emit('playerJoined', players[socket.id]);
-    });
-
-    socket.on('move', (pos) => {
-        if (players[socket.id]) {
-            players[socket.id].x = pos.x;
-            players[socket.id].z = pos.z;
-            socket.broadcast.emit('playerMoved', players[socket.id]);
-        }
+        socket.emit('authSuccess', { me: db.users[pseudo] });
     });
 
     socket.on('saveAll', (data) => {
-        if(socket.userId) db.users[socket.userId] = data;
-    });
-
-    socket.on('disconnect', () => {
-        socket.broadcast.emit('playerLeft', socket.id);
-        delete players[socket.id];
+        if(socket.userId) {
+            db.users[socket.userId] = data;
+            saveDB();
+        }
     });
 });
 
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(`Serveur Nexus Dynasty lancé sur le port ${PORT}`));
+const PORT = 3000;
+http.listen(PORT, () => console.log(`Serveur prêt sur http://localhost:${PORT}`));
