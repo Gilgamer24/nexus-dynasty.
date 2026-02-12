@@ -1,20 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty - Online</title>
+    <title>Nexus Dynasty - Beta</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; }
-        #ui { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; pointer-events: none; user-select: none; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); }
+        #ui { position: absolute; top: 15px; left: 15px; user-select: none; pointer-events: none; }
+        .hud-box { background: rgba(0, 0, 0, 0.6); color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #FFD700; margin-bottom: 10px; backdrop-filter: blur(5px); }
+        h2 { margin: 0 0 5px 0; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
+        #score { color: #FFD700; font-weight: bold; font-size: 24px; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: white; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 4px black; }
+        #notif { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); color: #FFD700; font-size: 20px; font-weight: bold; opacity: 0; transition: opacity 0.5s; text-shadow: 0 2px 4px black; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <b>NEXUS DYNASTY</b><br>
-        Déplacement: <b>Z Q S D</b><br>
-        Saut: <b>ESPACE</b><br>
-        <span id="status" style="color: yellow;">Connexion...</span>
+        <div class="hud-box">
+            <h2>Nexus Dynasty</h2>
+            Fragments: <span id="score">0</span>
+        </div>
+        <div class="hud-box" style="font-size: 12px; border-left-color: #4CAF50;">
+            Z,Q,S,D : Bouger<br>ESPACE : Sauter<br>SOURIS : Regarder
+        </div>
     </div>
+    <div id="notif">+1 FRAGMENT !</div>
     <div id="crosshair"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -26,135 +34,171 @@ import * as THREE from 'three';
 const socket = io();
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 20, 90);
+scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
 
-// --- CAMÉRA ---
+// --- CAMÉRA & RENDU ---
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Ombres douces
 document.body.appendChild(renderer.domElement);
 
-// --- LUMIÈRE ---
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.6));
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(50, 100, 50);
-dirLight.castShadow = true;
-scene.add(dirLight);
+// --- LUMIÈRES ---
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+scene.add(hemiLight);
+const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+sun.position.set(50, 80, 30);
+sun.castShadow = true;
+sun.shadow.camera.top = 50;
+sun.shadow.camera.bottom = -50;
+sun.shadow.camera.left = -50;
+sun.shadow.camera.right = 50;
+sun.shadow.mapSize.width = 2048;
+sun.shadow.mapSize.height = 2048;
+scene.add(sun);
 
-// --- MONDE (RELIEF & ARBRES) ---
+// --- MONDE (Relief & Couleurs) ---
 function getHeight(x, z) {
-    return (Math.sin(x * 0.05) * 2 + Math.cos(z * 0.05) * 2) + (Math.sin(x * 0.2) * 0.5);
+    // Relief plus prononcé et complexe
+    return (Math.sin(x * 0.04) * 3 + Math.cos(z * 0.04) * 3) + (Math.sin(x * 0.15 + z * 0.1) * 1);
 }
 
-const groundGeo = new THREE.PlaneGeometry(200, 200, 60, 60);
-const count = groundGeo.attributes.position.count;
+// Création du sol avec Vertex Colors (Dégradés)
+const geometry = new THREE.PlaneGeometry(200, 200, 100, 100);
+const count = geometry.attributes.position.count;
+const colors = [];
+const colorTop = new THREE.Color(0x7CFC00); // Vert clair (Haut)
+const colorBot = new THREE.Color(0x228B22); // Vert foncé (Bas)
+
 for (let i = 0; i < count; i++) {
-    const x = groundGeo.attributes.position.getX(i);
-    const z = groundGeo.attributes.position.getY(i);
-    groundGeo.attributes.position.setZ(i, getHeight(x, z));
+    const x = geometry.attributes.position.getX(i);
+    const z = geometry.attributes.position.getY(i); // Y est Z ici
+    const h = getHeight(x, z);
+    
+    geometry.attributes.position.setZ(i, h);
+    
+    // Mélange des couleurs selon la hauteur
+    const mixedColor = colorBot.clone().lerp(colorTop, (h + 5) / 10);
+    colors.push(mixedColor.r, mixedColor.g, mixedColor.b);
 }
-groundGeo.computeVertexNormals();
-const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ color: 0x567d46 })); // Herbe
+geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+geometry.computeVertexNormals();
+
+const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
+const ground = new THREE.Mesh(geometry, groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const trees = [];
-const treeGeo = new THREE.CylinderGeometry(0.5, 0.8, 3, 6);
-const leavesGeo = new THREE.ConeGeometry(2, 4, 8);
-const trunkMat = new THREE.MeshStandardMaterial({color: 0x8B4513});
-const leavesMat = new THREE.MeshStandardMaterial({color: 0x228B22});
+// --- DÉCORS (Arbres & Cristaux) ---
+const obstacles = [];
+const fragments = [];
 
 function addTree(x, z) {
     const y = getHeight(x, z);
     const group = new THREE.Group();
-    const trunk = new THREE.Mesh(treeGeo, trunkMat); trunk.position.y = 1.5;
-    const leaves = new THREE.Mesh(leavesGeo, leavesMat); leaves.position.y = 4.5;
+    
+    // Tronc
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2, 6), new THREE.MeshStandardMaterial({color: 0x5D4037}));
+    trunk.position.y = 1;
+    trunk.castShadow = true;
+    
+    // Feuilles (Low Poly style)
+    const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(1.8), new THREE.MeshStandardMaterial({color: 0x2E8B57}));
+    leaves.position.y = 3;
+    leaves.castShadow = true;
+    
     group.add(trunk, leaves);
     group.position.set(x, y, z);
+    
+    // Variation de taille aléatoire
+    const scale = 0.8 + Math.random() * 0.5;
+    group.scale.set(scale, scale, scale);
+    
     scene.add(group);
-    trees.push({x, z, radius: 1.5});
+    obstacles.push({x, z, r: 1.5 * scale});
 }
 
-// On génère toujours les mêmes arbres (seed simple) pour que tout le monde voit les mêmes obstacles
-for(let i=0; i<40; i++) {
-    // Une formule pseudo-aléatoire pour que les arbres soient au même endroit sur les 2 ordis
-    let pseudoX = Math.sin(i * 123) * 80;
-    let pseudoZ = Math.cos(i * 456) * 80;
-    addTree(pseudoX, pseudoZ);
+function addFragment(x, z) {
+    const y = getHeight(x, z) + 1.5;
+    const geo = new THREE.OctahedronGeometry(0.5);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x9932CC, emissive: 0x4B0082, metalness: 0.8 });
+    const crystal = new THREE.Mesh(geo, mat);
+    crystal.position.set(x, y, z);
+    scene.add(crystal);
+    fragments.push(crystal);
 }
 
-// --- MULTIJOUEUR ---
-const otherPlayers = {}; 
-let myId = "";
-
-// Créer le visuel d'un autre joueur
-function createOtherPlayer(id, data) {
-    const mesh = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.5, 1.8, 4, 8), 
-        new THREE.MeshStandardMaterial({color: data.color || 0xff0000})
-    );
-    mesh.position.set(data.x, data.y, data.z);
-    mesh.castShadow = true;
-    scene.add(mesh);
-    otherPlayers[id] = mesh;
+// Génération procédurale fixe
+for(let i=0; i<60; i++) {
+    // Position pseudo-aléatoire mais identique pour tous les joueurs
+    const x = Math.sin(i * 999) * 80;
+    const z = Math.cos(i * 888) * 80;
+    
+    if (i % 5 === 0) addFragment(x, z); // 1 fragment tous les 5 arbres
+    else addTree(x, z);
 }
 
-socket.on('connect', () => {
-    document.getElementById('status').innerText = "Connecté !";
-    document.getElementById('status').style.color = "lightgreen";
-    myId = socket.id;
-});
+// --- JOUEUR & MULTIJOUEUR ---
+let myPlayerGroup, myScore = 0;
+const otherPlayers = {};
 
-socket.on('currentPlayers', (players) => {
-    Object.keys(players).forEach(id => {
-        if (id !== myId && !otherPlayers[id]) {
-            createOtherPlayer(id, players[id]);
-        }
-    });
-});
+function updateScore(val) {
+    myScore = val;
+    document.getElementById('score').innerText = myScore;
+    const notif = document.getElementById('notif');
+    notif.style.opacity = 1;
+    notif.style.top = "15%";
+    setTimeout(() => { notif.style.opacity = 0; notif.style.top = "20%"; }, 1000);
+}
 
-socket.on('newPlayer', (data) => {
-    createOtherPlayer(data.id, data);
-});
-
-socket.on('playerMoved', (data) => {
-    if (otherPlayers[data.id]) {
-        // On bouge l'autre joueur doucement vers sa nouvelle position
-        otherPlayers[data.id].position.lerp(new THREE.Vector3(data.x, data.y, data.z), 0.5);
-    }
-});
-
-socket.on('playerDisconnected', (id) => {
-    if (otherPlayers[id]) {
-        scene.remove(otherPlayers[id]);
-        delete otherPlayers[id];
-    }
-});
-
-// --- CONTROLES & PHYSIQUE LOCALE ---
+// --- SETUP INITIAL ---
+myPlayerGroup = new THREE.Group();
+scene.add(myPlayerGroup);
 let myPos = new THREE.Vector3(0, 10, 0);
+
+// --- BOUCLE DE JEU ---
 let velocityY = 0;
 let canJump = false;
 let yaw = 0, pitch = 0;
 const keys = {};
 
-document.body.addEventListener('click', () => document.body.requestPointerLock());
-document.addEventListener('mousemove', (e) => {
+document.body.onclick = () => document.body.requestPointerLock();
+document.onmousemove = e => {
     if (document.pointerLockElement === document.body) {
         yaw -= e.movementX * 0.002;
         pitch -= e.movementY * 0.002;
         pitch = Math.max(-1.5, Math.min(1.5, pitch));
     }
+};
+window.onkeydown = e => keys[e.code] = true;
+window.onkeyup = e => keys[e.code] = false;
+
+// Gestion Multi
+socket.on('currentPlayers', (players) => {
+    Object.keys(players).forEach(id => {
+        if(id !== socket.id && !otherPlayers[id]) spawnOther(id, players[id]);
+    });
 });
-window.addEventListener('keydown', e => keys[e.code] = true);
-window.addEventListener('keyup', e => keys[e.code] = false);
+socket.on('newPlayer', (p) => spawnOther(p.id, p));
+socket.on('playerMoved', (p) => {
+    if(otherPlayers[p.id]) otherPlayers[p.id].position.lerp(new THREE.Vector3(p.x, p.y, p.z), 0.3);
+});
+socket.on('playerDisconnected', (id) => {
+    if(otherPlayers[id]) { scene.remove(otherPlayers[id]); delete otherPlayers[id]; }
+});
+
+function spawnOther(id, data) {
+    const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.8), new THREE.MeshStandardMaterial({color: 0xff4444}));
+    mesh.position.set(data.x, data.y, data.z);
+    scene.add(mesh);
+    otherPlayers[id] = mesh;
+}
 
 function animate() {
     requestAnimationFrame(animate);
 
-    // 1. PHYSIQUE LOCALE
     if (document.pointerLockElement === document.body) {
         const dir = new THREE.Vector3();
         if (keys['KeyW']) dir.z -= 1;
@@ -163,44 +207,50 @@ function animate() {
         if (keys['KeyD']) dir.x += 1;
         
         dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        if (dir.length() > 0) dir.normalize().multiplyScalar(0.2); // Vitesse
+        if (dir.length() > 0) dir.normalize().multiplyScalar(0.25);
 
-        // Collisions Arbres
-        let nextX = myPos.x + dir.x;
-        let nextZ = myPos.z + dir.z;
-        let collision = false;
-        for(let t of trees) {
-            if (Math.hypot(nextX - t.x, nextZ - t.z) < t.radius) collision = true;
-        }
-        if(!collision) {
-            myPos.x = nextX;
-            myPos.z = nextZ;
+        // Prédiction collision
+        const nextX = myPos.x + dir.x;
+        const nextZ = myPos.z + dir.z;
+        let collide = false;
+        
+        // Collision Arbres
+        for(let o of obstacles) {
+            if (Math.hypot(nextX - o.x, nextZ - o.z) < o.r) collide = true;
         }
 
-        if (keys['Space'] && canJump) {
-            velocityY = 0.5; // Force de saut
-            canJump = false;
+        // Collision Fragments (Ramassage)
+        for(let i = fragments.length - 1; i >= 0; i--) {
+            const f = fragments[i];
+            f.rotation.y += 0.02; // Animation
+            f.position.y = getHeight(f.position.x, f.position.z) + 1.5 + Math.sin(Date.now()*0.003)*0.3; // Flottement
+
+            if (myPos.distanceTo(f.position) < 1.5) {
+                scene.remove(f);
+                fragments.splice(i, 1);
+                updateScore(myScore + 1);
+            }
         }
+
+        if(!collide) { myPos.x = nextX; myPos.z = nextZ; }
+        if (keys['Space'] && canJump) { velocityY = 0.5; canJump = false; }
     }
 
-    // Gravité
-    velocityY -= 0.02;
+    // Physique Y
+    velocityY -= 0.025;
     myPos.y += velocityY;
-    
-    let groundH = getHeight(myPos.x, myPos.z);
-    if (myPos.y < groundH + 1.5) {
-        myPos.y = groundH + 1.5;
+    const groundH = getHeight(myPos.x, myPos.z);
+    if (myPos.y < groundH + 1.6) {
+        myPos.y = groundH + 1.6;
         velocityY = 0;
         canJump = true;
     }
 
-    // 2. ENVOI AU SERVEUR (Le cœur du multijoueur)
-    // On envoie notre position aux autres
+    // Envoi
     socket.emit('playerMovement', { x: myPos.x, y: myPos.y, z: myPos.z });
 
-    // 3. MISE À JOUR CAMÉRA
+    // Caméra
     camera.position.copy(myPos);
-    camera.position.y += 0.5; 
     camera.rotation.set(pitch, yaw, 0, 'YXZ');
 
     renderer.render(scene, camera);
