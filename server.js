@@ -12,7 +12,9 @@ io.on('connection', (socket) => {
     socket.on('login', (data) => {
         const { pseudo } = data;
         if (!db.users[pseudo]) {
-            db.users[pseudo] = { pseudo, gold: 100, food: 100, hp: 100, oreStock: 0, houses: [] };
+            db.users[pseudo] = { 
+                pseudo, gold: 100, food: 100, hp: 100, oreStock: 0, houses: [] 
+            };
         }
         socket.userId = pseudo;
         players[socket.id] = { id: socket.id, pseudo: pseudo, x: 0, z: 0 };
@@ -38,5 +40,4 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log("Nexus Final Engine Online"));
+http.listen(3000, () => console.log("Server Running - Multi & Mining Fix"));
