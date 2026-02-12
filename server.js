@@ -16,20 +16,14 @@ io.on('connection', (socket) => {
         if (!db.users[pseudo]) {
             db.users[pseudo] = { 
                 pseudo, gold: 0, food: 100, hp: 100, 
-                houses: [], tutoStep: 0 
+                houses: [], status: "new" 
             };
         }
         socket.userId = pseudo;
-        // Envoi des données initiales et des bâtiments existants
         socket.emit('authSuccess', {
             user: db.users[pseudo],
             houses: db.globalHouses
         });
-    });
-
-    socket.on('buildGlobal', (houseData) => {
-        db.globalHouses.push(houseData);
-        io.emit('newHouse', houseData);
     });
 
     socket.on('updateStats', (s) => {
@@ -39,7 +33,12 @@ io.on('connection', (socket) => {
             db.users[socket.userId].hp = Number(s.hp) || 0;
         }
     });
+
+    socket.on('buildGlobal', (houseData) => {
+        db.globalHouses.push(houseData);
+        socket.broadcast.emit('newHouse', houseData);
+    });
 });
 
 const PORT = 3000;
-http.listen(PORT, () => console.log(`Serveur Nexus Logistique sur http://localhost:${PORT}`));
+http.listen(PORT, () => console.log(`Serveur Nexus Dynasty : http://localhost:${PORT}`));
