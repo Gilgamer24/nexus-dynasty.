@@ -2,54 +2,60 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Nexus Dynasty : Monde Persistant</title>
+    <title>Nexus Dynasty : Économie & Marché</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Arial Black', sans-serif; color: white; }
-        canvas { display: block; }
-        
-        /* Interface */
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; color: white; }
         .ui-layer { position: absolute; pointer-events: none; inset: 0; }
-        .panel { position: absolute; background: rgba(0, 10, 20, 0.85); border: 3px solid #00f2ff; padding: 15px; border-radius: 12px; pointer-events: auto; }
+        .panel { position: absolute; background: rgba(0, 5, 15, 0.9); border: 2px solid #00f2ff; padding: 12px; border-radius: 10px; pointer-events: auto; box-shadow: 0 0 15px rgba(0,242,255,0.2); }
         
-        #stats { top: 15px; left: 15px; display: flex; gap: 20px; font-size: 18px; text-shadow: 2px 2px 0 #000; }
-        #menu { bottom: 20px; left: 20px; width: 320px; }
+        #stats { top: 10px; left: 10px; display: flex; gap: 15px; font-weight: bold; }
+        #inventory { top: 60px; left: 10px; border-color: #ffd700; color: #ffd700; }
         
-        .btn { width: 100%; padding: 12px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 2px solid #00f2ff; cursor: pointer; font-weight: bold; border-radius: 6px; transition: 0.2s; }
-        .btn:hover:not(:disabled) { background: #00f2ff; color: #000; transform: scale(1.02); }
-        .btn:disabled { opacity: 0.3; filter: grayscale(1); }
+        #menu { bottom: 20px; left: 20px; width: 280px; }
+        #market-ui { top: 10px; right: 10px; width: 250px; max-height: 300px; overflow-y: auto; display: none; }
 
-        #game-over { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
-        #login-screen { position: absolute; inset: 0; background: #000; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 15px; margin: 10px; width: 280px; border-radius: 8px; border: 2px solid #00f2ff; background: #111; color: white; text-align: center; }
+        .btn { width: 100%; padding: 10px; margin: 4px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; border-radius: 4px; }
+        .btn:hover { background: #00f2ff; color: #000; }
+        .btn-sell { background: #1a1a00; color: #ffd700; border-color: #ffd700; }
 
-        .house-label { position: absolute; background: gold; color: black; padding: 2px 6px; font-weight: bold; border-radius: 4px; pointer-events: none; transform: translate(-50%, -100%); font-size: 14px; }
+        #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { padding: 12px; margin: 10px; width: 220px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; }
+
+        .trade-zone { position: absolute; bottom: 200px; left: 50%; transform: translateX(-50%); background: gold; color: black; padding: 10px; border-radius: 20px; display: none; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="color:#00f2ff; letter-spacing: 10px;">NEXUS DYNASTY</h1>
-        <input type="text" id="pseudo" placeholder="NOM DU SOUVERAIN">
-        <button class="btn" style="width: 250px;" onclick="connect()">RÉGNER</button>
+        <h1 style="color: #00f2ff; letter-spacing: 5px;">NEXUS DYNASTY</h1>
+        <input type="text" id="pseudo" placeholder="PSEUDO">
+        <button class="btn" style="width: 150px;" onclick="connect()">ENTRER</button>
     </div>
 
-    <div id="game-over">
-        <h1 style="color:red; font-size: 60px;">DYNASTIE ÉTEINTE</h1>
-        <button class="btn" style="width: 250px;" onclick="location.reload()">RENAÎTRE</button>
-    </div>
+    <div id="trade-prompt" class="trade-zone">💰 APPUYEZ SUR [E] POUR VENDRE AU MARCHAND</div>
 
     <div class="ui-layer">
         <div id="stats" class="panel">
             <span style="color:#ff4d4d">❤️ <span id="hp">100</span></span>
             <span style="color:#4dff4d">🍞 <span id="food">100</span></span>
-            <span style="color:#ffff4d">💰 <span id="gold">0</span></span>
-            <span style="color:#4dffff">🤖 <span id="work-cnt">0</span></span>
+            <span style="color:#00f2ff">💰 <span id="gold">0</span></span>
+        </div>
+
+        <div id="inventory" class="panel">
+            📦 STOCK MINERAI: <span id="ore-qty">0</span>
+        </div>
+
+        <div id="market-ui" class="panel">
+            <h3 style="margin:0 0 10px 0; color:#ffd700">🛒 SHOP GLOBAL</h3>
+            <div id="market-list"></div>
+            <hr>
+            <button class="btn btn-sell" onclick="postToMarket()">VENDRE 10 MINERAIS (50G)</button>
         </div>
 
         <div id="menu" class="panel">
-            <button class="btn" id="btn-house" onclick="buildHouse()">🏠 POSER MAISON (100G)</button>
-            <button class="btn" id="btn-worker" onclick="addWorker()">🤖 RECRUTER MINEUR (150G)</button>
-            <button class="btn" onclick="buyFood()">🍞 ACHETER NOURRITURE (30G)</button>
+            <button class="btn" onclick="buildHouse()">🏠 POSER MAISON (100G)</button>
+            <button class="btn" onclick="addWorker()">🤖 RECRUTER MINEUR (150G)</button>
+            <button class="btn" onclick="toggleMarket()">🌐 OUVRIR LE SHOP GLOBAL</button>
         </div>
     </div>
 
@@ -60,9 +66,8 @@
 import * as THREE from 'three';
 
 const socket = io();
-let scene, camera, renderer, player, myStats;
+let scene, camera, renderer, player, merchant, myStats;
 const workers = [], ores = [], myHouses = [];
-let isDead = false;
 
 window.connect = () => {
     const ps = document.getElementById('pseudo').value;
@@ -78,178 +83,141 @@ socket.on('authSuccess', (data) => {
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB);
-    scene.fog = new THREE.FogExp2(0x87CEEB, 0.015);
-
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Lumières
-    const amb = new THREE.AmbientLight(0xffffff, 0.6);
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-    sun.position.set(50, 100, 50);
-    scene.add(amb, sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-    // SOL VERT
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({color: 0x3a9d23}));
+    // Sol Herbe
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({color: 0x228B22}));
     ground.rotation.x = -Math.PI/2;
     scene.add(ground);
 
-    // ENVIRONNEMENT (Arbres décoratifs)
-    for(let i=0; i<60; i++) {
-        const tree = new THREE.Group();
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1), new THREE.MeshStandardMaterial({color: 0x5d3a1a}));
-        const leaves = new THREE.Mesh(new THREE.ConeGeometry(1, 2, 8), new THREE.MeshStandardMaterial({color: 0x1a5d1a}));
-        leaves.position.y = 1.2;
-        tree.add(trunk, leaves);
-        tree.position.set(Math.random()*200-100, 0.5, Math.random()*200-100);
-        scene.add(tree);
-    }
-
-    // JOUEUR
+    // Joueur
     player = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
     player.position.y = 0.8;
     scene.add(player);
 
-    // MINERAIS (Cibles de minage)
-    const oreGeo = new THREE.DodecahedronGeometry(1);
-    for(let i=0; i<35; i++) {
-        const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({color: 0x444444}));
-        ore.position.set(Math.random()*160-80, 0.5, Math.random()*160-80);
+    // PNG MARCHAND (Cube Violet)
+    merchant = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0x9932CC}));
+    merchant.position.set(10, 1, 10);
+    scene.add(merchant);
+
+    // Minerais
+    const oreGeo = new THREE.DodecahedronGeometry(0.8);
+    for(let i=0; i<30; i++) {
+        const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({color: 0x555555}));
+        ore.position.set(Math.random()*100-50, 0.4, Math.random()*100-50);
         scene.add(ore);
         ores.push(ore);
     }
 
-    // MINAGE MANUEL (Cliquez sur un bloc)
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    window.onclick = (e) => {
-        if(isDead) return;
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(ores);
-        if(hits.length > 0) {
-            const target = hits[0].object;
-            target.scale.multiplyScalar(0.9);
-            myStats.gold += 5;
-            if(target.scale.x < 0.4) {
-                target.position.set(Math.random()*160-80, 0.5, Math.random()*160-80);
-                target.scale.set(1, 1, 1);
-            }
+    const keys = {};
+    window.onkeydown = e => {
+        keys[e.code] = true;
+        if(e.code === 'KeyE' && player.position.distanceTo(merchant.position) < 4) {
+            sellToMerchant();
         }
     };
-
-    const keys = {};
-    window.onkeydown = e => keys[e.code] = true;
     window.onkeyup = e => keys[e.code] = false;
 
     function animate() {
-        if(isDead) return;
         requestAnimationFrame(animate);
+        
+        // Move Player
+        if(keys['KeyW']) player.position.z -= 0.2;
+        if(keys['KeyS']) player.position.z += 0.2;
+        if(keys['KeyA']) player.position.x -= 0.2;
+        if(keys['KeyD']) player.position.x += 0.2;
 
-        // Déplacement
-        if(keys['KeyW']) player.position.z -= 0.22;
-        if(keys['KeyS']) player.position.z += 0.22;
-        if(keys['KeyA']) player.position.x -= 0.22;
-        if(keys['KeyD']) player.position.x += 0.22;
-
-        // IA MINEURS
+        // IA Mineurs
         workers.forEach(w => {
             const target = w.carrying ? w.homeBase.mesh : w.targetOre;
-            const dist = w.mesh.position.distanceTo(target.position);
-            
-            if(dist > 2.0) {
+            if(w.mesh.position.distanceTo(target.position) > 1.5) {
                 const dir = new THREE.Vector3().subVectors(target.position, w.mesh.position).normalize();
-                w.mesh.position.add(dir.multiplyScalar(0.14));
-                w.mesh.lookAt(target.position);
+                w.mesh.position.add(dir.multiplyScalar(0.12));
             } else {
-                if(!w.carrying) {
-                    w.mineProgress++;
-                    w.targetOre.scale.set(1.1, 1.1, 1.1);
-                    if(w.mineProgress > 60) {
-                        w.carrying = true;
-                        w.mineProgress = 0;
-                        w.targetOre.scale.set(1, 1, 1);
-                    }
+                if(!w.carrying) { 
+                    w.carrying = true; 
                 } else {
-                    w.homeBase.storedGold += 25;
+                    w.homeBase.storedOre += 1; // Stocke du minerai brut
                     w.carrying = false;
                     w.targetOre = ores[Math.floor(Math.random()*ores.length)];
                 }
             }
         });
 
-        // Collecte aux Maisons
+        // Récupération aux Maisons
         myHouses.forEach(h => {
-            if(player.position.distanceTo(h.mesh.position) < 4) {
-                myStats.gold += h.storedGold;
-                h.storedGold = 0;
+            if(player.position.distanceTo(h.mesh.position) < 3) {
+                myStats.oreStock += h.storedOre;
+                h.storedOre = 0;
             }
-            const vector = h.mesh.position.clone().project(camera);
-            h.label.style.left = (vector.x + 1) / 2 * window.innerWidth + 'px';
-            h.label.style.top = -(vector.y - 1) / 2 * window.innerHeight + 'px';
-            h.label.innerText = h.storedGold > 0 ? `💰 ${h.storedGold}G` : "";
         });
 
-        camera.position.lerp(new THREE.Vector3(player.position.x, 15, player.position.z + 20), 0.1);
+        // Distance Marchand
+        const distToMerchant = player.position.distanceTo(merchant.position);
+        document.getElementById('trade-prompt').style.display = distToMerchant < 4 ? 'block' : 'none';
+
+        // Marchand qui bouge un peu
+        merchant.position.x += Math.sin(Date.now()*0.001)*0.02;
+
+        camera.position.lerp(new THREE.Vector3(player.position.x, 15, player.position.z + 15), 0.1);
         camera.lookAt(player.position);
         renderer.render(scene, camera);
         updateUI();
     }
     animate();
 
-    // Boucle de Famine
+    // Faim
     setInterval(() => {
-        if(!isDead) {
-            myStats.food = Math.max(0, myStats.food - (0.5 + workers.length * 0.15));
-            if(myStats.food <= 0) myStats.hp -= 2;
-            if(myStats.hp <= 0) {
-                isDead = true;
-                document.getElementById('game-over').style.display = 'flex';
-            }
-            socket.emit('updateStats', myStats);
-        }
+        myStats.food = Math.max(0, myStats.food - 0.5);
+        if(myStats.food <= 0) myStats.hp -= 1;
+        socket.emit('updateStats', myStats);
     }, 1000);
 }
+
+// FONCTIONS ÉCONOMIE
+function sellToMerchant() {
+    if(myStats.oreStock > 0) {
+        const amount = myStats.oreStock;
+        myStats.oreStock = 0;
+        myStats.gold += amount * 8; // Le PNG achète à 8G l'unité
+        alert(`Vendu ! +${amount * 8} Or`);
+    }
+}
+
+window.postToMarket = () => {
+    if(myStats.oreStock >= 10) {
+        myStats.oreStock -= 10;
+        socket.emit('postOffer', { seller: myStats.pseudo, qty: 10, price: 50 });
+    }
+};
+
+window.toggleMarket = () => {
+    const m = document.getElementById('market-ui');
+    m.style.display = m.style.display === 'none' ? 'block' : 'none';
+};
 
 window.buildHouse = () => {
     if(myStats.gold >= 100) {
         myStats.gold -= 100;
-        const group = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), new THREE.MeshStandardMaterial({color: 0x5d3a1a}));
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 2, 4), new THREE.MeshStandardMaterial({color: 0x9d2323}));
-        roof.position.y = 2.5; roof.rotation.y = Math.PI/4;
-        group.add(base, roof);
-        group.position.set(player.position.x, 1.5, player.position.z - 6);
-        scene.add(group);
-
-        const label = document.createElement('div');
-        label.className = 'house-label';
-        document.body.appendChild(label);
-        myHouses.push({ mesh: group, storedGold: 0, label });
+        const h = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), new THREE.MeshStandardMaterial({color: 0x8B4513}));
+        h.position.set(player.position.x, 1, player.position.z - 5);
+        scene.add(h);
+        myHouses.push({ mesh: h, storedOre: 0 });
     }
 };
 
 window.addWorker = () => {
     if(myStats.gold >= 150 && myHouses.length > 0) {
         myStats.gold -= 150;
-        const m = new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({color: 0xffff00}));
-        m.position.copy(player.position);
-        scene.add(m);
-        workers.push({
-            mesh: m, carrying: false, mineProgress: 0,
-            targetOre: ores[Math.floor(Math.random()*ores.length)],
-            homeBase: myHouses[myHouses.length - 1]
-        });
-    }
-};
-
-window.buyFood = () => {
-    if(myStats.gold >= 30) {
-        myStats.gold -= 30;
-        myStats.food = Math.min(100, myStats.food + 50);
+        const w = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color: 0xffff00}));
+        w.position.copy(player.position);
+        scene.add(w);
+        workers.push({ mesh: w, carrying: false, targetOre: ores[0], homeBase: myHouses[0] });
     }
 };
 
@@ -257,10 +225,17 @@ function updateUI() {
     document.getElementById('hp').innerText = Math.floor(myStats.hp);
     document.getElementById('food').innerText = Math.floor(myStats.food);
     document.getElementById('gold').innerText = Math.floor(myStats.gold);
-    document.getElementById('work-cnt').innerText = workers.length;
-    document.getElementById('btn-worker').disabled = (myStats.gold < 150 || myHouses.length === 0);
-    document.getElementById('btn-house').disabled = (myStats.gold < 100);
+    document.getElementById('ore-qty').innerText = myStats.oreStock;
 }
+
+socket.on('marketUpdate', (list) => {
+    const div = document.getElementById('market-list');
+    div.innerHTML = list.map(o => `
+        <div style="font-size:12px; border-bottom:1px solid #333; padding:5px;">
+            ${o.seller}: ${o.qty} Minerais pour ${o.price}G
+        </div>
+    `).join('');
+});
 </script>
 </body>
 </html>
