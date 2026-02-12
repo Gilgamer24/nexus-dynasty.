@@ -1,23 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty - HD</title>
+    <title>Nexus Dynasty - Multijoueur Fix</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #a0c4ff; font-family: 'Segoe UI', sans-serif; }
-        #ui { position: absolute; top: 15px; left: 15px; user-select: none; pointer-events: none; }
-        .hud-box { background: rgba(0, 0, 0, 0.7); color: white; padding: 15px; border-radius: 12px; border-bottom: 4px solid #FFD700; margin-bottom: 10px; backdrop-filter: blur(8px); min-width: 180px; }
-        h2 { margin: 0; font-size: 14px; color: #aaa; text-transform: uppercase; }
-        #score { color: #FFD700; font-weight: bold; font-size: 32px; display: block; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translate(-50%, -50%); outline: 100px solid rgba(255,255,255,0.1); }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; }
+        #ui { position: absolute; top: 15px; left: 15px; pointer-events: none; }
+        .hud { background: rgba(0, 0, 0, 0.7); color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #00f2ff; backdrop-filter: blur(5px); }
+        #score { color: #00f2ff; font-size: 24px; font-weight: bold; }
+        #status { font-size: 12px; margin-top: 5px; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div class="hud-box">
-            <h2>Fragments Récoltés</h2>
-            <span id="score">0</span>
+        <div class="hud">
+            NEXUS DYNASTY<br>
+            Fragments: <span id="score">0</span>
+            <div id="status">Statut: Connexion...</div>
         </div>
     </div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
 
@@ -26,71 +27,87 @@ import * as THREE from 'three';
 
 const socket = io();
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xa0c4ff);
-scene.fog = new THREE.FogExp2(0xa0c4ff, 0.02); // Brouillard plus naturel
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.toneMapping = THREE.ReinhardToneMapping; // Meilleures couleurs
 document.body.appendChild(renderer.domElement);
 
-// --- LUMIÈRES STYLE "CARTOON HD" ---
-const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-sun.position.set(20, 50, 20);
+// --- LUMIÈRES ---
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(10, 20, 10);
 scene.add(sun);
 
-// --- TERRAIN AVANCÉ ---
+// --- TERRAIN ---
 function getHeight(x, z) {
-    // Un relief plus varié : grandes collines + petites bosses
-    return (Math.sin(x * 0.03) * 4 + Math.cos(z * 0.03) * 4) + (Math.sin(x * 0.1) * 1);
+    return (Math.sin(x * 0.05) * 2.5 + Math.cos(z * 0.05) * 2.5);
 }
 
-const geo = new THREE.PlaneGeometry(240, 240, 100, 100);
-const colors = [];
-const pos = geo.attributes.position;
-for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getY(i);
-    const h = getHeight(x, z);
-    pos.setZ(i, h);
-    
-    // Couleur : Sable si bas, Herbe si moyen, Sommet clair si haut
-    const c = new THREE.Color();
-    if (h < -2) c.setHex(0xd4a373); // Sable/Terre
-    else if (h > 3) c.setHex(0x90be6d); // Herbe claire
-    else c.setHex(0x4d908e); // Herbe foncée
-    colors.push(c.r, c.g, c.b);
+const groundGeo = new THREE.PlaneGeometry(200, 200, 80, 80);
+const posArr = groundGeo.attributes.position;
+for (let i = 0; i < posArr.count; i++) {
+    const x = posArr.getX(i);
+    const z = posArr.getY(i);
+    posArr.setZ(i, getHeight(x, z));
 }
-geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-geo.computeVertexNormals();
-
-const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
+groundGeo.computeVertexNormals();
+const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ color: 0x567d46 }));
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
-// --- FRAGMENTS & DÉCORS ---
-const fragments = [];
-for(let i=0; i<40; i++) {
-    const fx = (Math.random() - 0.5) * 150;
-    const fz = (Math.random() - 0.5) * 150;
-    const fy = getHeight(fx, fz) + 1.5;
-    
-    const crystal = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(0.6, 0),
-        new THREE.MeshStandardMaterial({ color: 0x00f2ff, emissive: 0x0066ff, metalness: 1, roughness: 0 })
-    );
-    crystal.position.set(fx, fy, fz);
-    scene.add(crystal);
-    fragments.push(crystal);
+// --- MULTIJOUEUR LOGIQUE ---
+const otherPlayers = {};
+let myId = "";
+
+function createPlayerMesh(color = 0xffffff) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.2, 4, 8), new THREE.MeshStandardMaterial({color: color}));
+    body.position.y = 0.9;
+    group.add(body);
+    return group;
 }
 
-// --- JOUEUR ---
-let myPos = new THREE.Vector3(0, 10, 0);
-let myScore = 0;
-let yaw = 0, pitch = 0, velocityY = 0, canJump = false;
+socket.on('connect', () => {
+    myId = socket.id;
+    document.getElementById('status').innerText = "Statut: En ligne";
+    document.getElementById('status').style.color = "lightgreen";
+});
+
+socket.on('currentPlayers', (players) => {
+    Object.keys(players).forEach(id => {
+        if (id !== myId) {
+            otherPlayers[id] = createPlayerMesh(players[id].color);
+            scene.add(otherPlayers[id]);
+        }
+    });
+});
+
+socket.on('newPlayer', (data) => {
+    if (!otherPlayers[data.id]) {
+        otherPlayers[data.id] = createPlayerMesh(data.color);
+        scene.add(otherPlayers[id]);
+    }
+});
+
+socket.on('playerMoved', (data) => {
+    if (otherPlayers[data.id]) {
+        otherPlayers[data.id].position.set(data.x, data.y, data.z);
+    }
+});
+
+socket.on('playerDisconnected', (id) => {
+    if (otherPlayers[id]) {
+        scene.remove(otherPlayers[id]);
+        delete otherPlayers[id];
+    }
+});
+
+// --- CONTROLES & PHYSIQUE ---
+let myPos = new THREE.Vector3(0, 5, 0);
+let velocityY = 0, canJump = false, yaw = 0, pitch = 0;
 const keys = {};
 
 document.body.onclick = () => document.body.requestPointerLock();
@@ -104,47 +121,42 @@ document.onmousemove = e => {
 window.onkeydown = e => keys[e.code] = true;
 window.onkeyup = e => keys[e.code] = false;
 
-// Multi
-const otherPlayers = {};
-socket.on('playerMoved', p => {
-    if(otherPlayers[p.id]) otherPlayers[p.id].position.lerp(new THREE.Vector3(p.x, p.y, p.z), 0.2);
-    else {
-        const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.8), new THREE.MeshStandardMaterial({color: 0xff4477}));
-        scene.add(m); otherPlayers[p.id] = m;
-    }
-});
-
 function animate() {
     requestAnimationFrame(animate);
-    
+
     if (document.pointerLockElement === document.body) {
         const move = new THREE.Vector3();
-        if (keys['KeyW']) move.z -= 1; if (keys['KeyS']) move.z += 1;
-        if (keys['KeyA']) move.x -= 1; if (keys['KeyD']) move.x += 1;
-        move.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).normalize().multiplyScalar(0.28);
+        if (keys['KeyW']) move.z -= 1;
+        if (keys['KeyS']) move.z += 1;
+        if (keys['KeyA']) move.x -= 1;
+        if (keys['KeyD']) move.x += 1;
         
+        move.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).normalize().multiplyScalar(0.2);
         myPos.add(move);
-        if (keys['Space'] && canJump) { velocityY = 0.5; canJump = false; }
+
+        if (keys['Space'] && canJump) {
+            velocityY = 0.4;
+            canJump = false;
+        }
     }
 
+    // Gravité
     velocityY -= 0.02;
     myPos.y += velocityY;
-    const h = getHeight(myPos.x, myPos.z) + 1.6;
-    if (myPos.y < h) { myPos.y = h; velocityY = 0; canJump = true; }
+    const h = getHeight(myPos.x, myPos.z) + 1.5;
+    if (myPos.y < h) {
+        myPos.y = h;
+        velocityY = 0;
+        canJump = true;
+    }
 
-    // Collecte
-    fragments.forEach((f, i) => {
-        f.rotation.y += 0.03;
-        f.position.y += Math.sin(Date.now()*0.005)*0.01;
-        if(myPos.distanceTo(f.position) < 1.5) {
-            f.position.set(0,-100,0); // Cache le fragment
-            myScore++; document.getElementById('score').innerText = myScore;
-        }
-    });
-
+    // Envoi au serveur
     socket.emit('playerMovement', { x: myPos.x, y: myPos.y, z: myPos.z });
+
+    // Caméra
     camera.position.copy(myPos);
     camera.rotation.set(pitch, yaw, 0, 'YXZ');
+
     renderer.render(scene, camera);
 }
 animate();
