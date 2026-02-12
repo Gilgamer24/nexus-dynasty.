@@ -1,38 +1,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nexus Dynasty : Origins</title>
+    <title>Nexus Dynasty : Economy</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; }
-        #hud { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 30px; border: 2px solid #00f2ff; color: white; z-index: 100; }
-        .side-panel { position: absolute; left: 15px; top: 80px; width: 230px; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; color: white; z-index: 100; border-radius: 12px; }
-        .bar-container { width: 100px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
-        #hp-fill { width: 100%; height: 100%; background: #ff4444; transition: 0.3s; }
-        #food-fill { width: 100%; height: 100%; background: #ffaa00; transition: 0.3s; }
-        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #004466; color: white; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; border-radius: 5px; }
-        .btn:hover { background: #00f2ff; color: black; }
-        #pseudo-tag { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; text-shadow: 2px 2px #000; pointer-events: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial', sans-serif; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; color: white; padding: 15px; pointer-events: auto; border-radius: 10px; }
+        #top-bar { top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 30px; border-radius: 40px; }
+        #build-menu { bottom: 20px; left: 20px; width: 200px; }
+        .stat { font-weight: bold; font-size: 18px; }
+        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #004466; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; border-radius: 5px; }
+        .btn:hover { background: #00f2ff; color: #000; }
     </style>
 </head>
 <body>
 
-    <div id="hud">
-        <div>❤️ VIE <div class="bar-container"><div id="hp-fill"></div></div></div>
-        <div>🍞 FAIM <div class="bar-container"><div id="food-fill"></div></div></div>
-        <div>💰 OR: <span id="gold-val">0</span></div>
+<div id="ui">
+    <div id="top-bar" class="panel">
+        <div class="stat">❤️ VIE: <span id="hp">100</span></div>
+        <div class="stat">🍞 FAIM: <span id="food">100</span></div>
+        <div class="stat">💰 OR: <span id="gold">0</span></div>
     </div>
 
-    <div id="pseudo-tag">Zone de Paix</div>
-
-    <div class="side-panel">
-        <h3 style="margin:0 0 10px 0; color:#00f2ff">🏗️ EMPIRE</h3>
-        <p id="player-name">Pseudo: ...</p>
-        <button class="btn" onclick="build('farm')">FERME (50G)</button>
-        <button class="btn" onclick="build('mine')">MINE (80G)</button>
-        <button class="btn" style="background:#446600" onclick="sellFood()">VENDRE STOCK (+20G)</button>
-        <hr border="0" style="border-top:1px solid #333">
-        <small>Cliquer sur l'herbe pour bouger la caméra</small>
+    <div id="build-menu" class="panel">
+        <h3 style="margin:0 0 10px 0">CONSTRUCTION</h3>
+        <button class="btn" onclick="socket.emit('requestBuild', 'farm')">FERME (50G)</button>
+        <button class="btn" onclick="socket.emit('requestBuild', 'mine')">MINE (80G)</button>
     </div>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
@@ -40,15 +35,9 @@
 <script type="module">
 import * as THREE from 'three';
 
-// --- SAUVEGARDE & CONNEXION ---
-const pseudo = localStorage.getItem('nexus_pseudo') || prompt("Entre ton Pseudo :", "Souverain");
-localStorage.setItem('nexus_pseudo', pseudo);
-const savedGold = parseInt(localStorage.getItem('nexus_gold')) || 100;
-
+const pseudo = prompt("Ton Pseudo de Souverain :", "Joueur_" + Math.floor(Math.random()*999));
 const socket = io();
-socket.emit('joinGame', { pseudo: pseudo, gold: savedGold });
 
-// --- SCÈNE 3D ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -56,102 +45,86 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.position.set(10, 20, 10);
+sun.position.set(20, 50, 20);
 scene.add(sun);
 
-// --- MONDE ---
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({color: 0x44aa44}));
+// --- MODELS 3D ---
+function createPlayerModel(color) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.4), new THREE.MeshStandardMaterial({color}));
+    body.position.y = 0.5;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshStandardMaterial({color: 0xffdbac}));
+    head.position.y = 1.2;
+    group.add(body, head);
+    return group;
+}
+
+function createBuildingModel(type) {
+    const group = new THREE.Group();
+    if(type === 'farm') {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(2, 1, 2), new THREE.MeshStandardMaterial({color: 0x8B4513}));
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1, 4), new THREE.MeshStandardMaterial({color: 0xff0000}));
+        roof.position.y = 1; roof.rotation.y = Math.PI/4;
+        group.add(base, roof);
+    } else {
+        const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1, 2), new THREE.MeshStandardMaterial({color: 0x444444}));
+        tower.position.y = 1;
+        group.add(tower);
+    }
+    return group;
+}
+
+// --- MONDE & ZONES ---
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({color: 0x333333}));
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// Cercle de construction (Zone de Paix)
-const circle = new THREE.Mesh(new THREE.CircleGeometry(30, 32), new THREE.MeshStandardMaterial({color: 0x55cc55}));
-circle.rotation.x = -Math.PI/2; circle.position.y = 0.01;
-scene.add(circle);
+const peaceZone = new THREE.Mesh(new THREE.CircleGeometry(40, 32), new THREE.MeshStandardMaterial({color: 0x44aa44}));
+peaceZone.rotation.x = -Math.PI/2; peaceZone.position.y = 0.01;
+scene.add(peaceZone);
 
-// --- MODÈLES ---
-function createPlayerModel(color) {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color}));
-    body.position.y = 0.6;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color: 0xffdbac}));
-    head.position.y = 1.1;
-    g.add(body, head);
-    return g;
-}
-
-function createBuilderModel() {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.6, 0.4), new THREE.MeshStandardMaterial({color: 0xffff00}));
-    body.position.y = 0.3;
-    g.add(body);
-    return g;
-}
-
-// --- LOGIQUE JEU ---
+// --- LOGIQUE MULTI ---
+let myId;
 const players = {};
-let myId = "";
-let myStats = { gold: savedGold, food: 100, hp: 100 };
-let yaw = 0;
-const keys = {};
+const buildings = {};
 
-socket.on('initPlayer', d => {
-    myId = d.id;
-    document.getElementById('player-name').innerText = "Souverain: " + d.pseudo;
+socket.emit('join', { pseudo });
+
+socket.on('init', (data) => {
+    myId = data.id;
+    Object.keys(data.players).forEach(id => {
+        players[id] = createPlayerModel(data.players[id].color);
+        scene.add(players[id]);
+    });
+    data.buildings.forEach(b => spawnBuilding(b));
 });
 
-socket.on('updatePlayerList', data => {
-    Object.keys(data).forEach(id => {
-        if(!players[id]) {
-            players[id] = createPlayerModel(data[id].color);
-            scene.add(players[id]);
-        }
-    });
+socket.on('newPlayer', d => {
+    players[d.id] = createPlayerModel(d.color);
+    scene.add(players[d.id]);
 });
 
 socket.on('playerMoved', d => { if(players[d.id]) players[d.id].position.set(d.x, d.y, d.z); });
 
-// --- ACTIONS ---
-window.build = (type) => {
-    const cost = type === 'farm' ? 50 : 80;
-    if(myStats.gold < cost) return alert("Or insuffisant !");
-    myStats.gold -= cost;
-    
-    // Apparition du constructeur
-    const builder = createBuilderModel();
-    builder.position.copy(players[myId].position);
-    scene.add(builder);
-    
-    const target = players[myId].position.clone().add(new THREE.Vector3(4, 0, 4));
-    let progress = 0;
-    const itv = setInterval(() => {
-        builder.position.lerp(target, 0.1);
-        progress++;
-        if(progress > 40) {
-            clearInterval(itv);
-            const b = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshStandardMaterial({color: type==='farm'?0x8B4513:0x555555}));
-            b.position.copy(target); b.position.y = 1;
-            scene.add(b);
-            scene.remove(builder);
-            if(type==='farm') setInterval(() => { myStats.food = Math.min(100, myStats.food+5); }, 5000);
-        }
-    }, 100);
-};
+socket.on('updateStats', d => {
+    document.getElementById('hp').innerText = d.hp || 100;
+    document.getElementById('gold').innerText = d.gold;
+    document.getElementById('food').innerText = d.food;
+});
 
-// --- BOUCLE PRINCIPALE ---
-setInterval(() => {
-    if(!myId) return;
-    myStats.food -= (players[myId].position.length() > 30) ? 1.5 : 0.2;
-    if(myStats.food <= 0) { myStats.food = 0; myStats.hp -= 2; }
-    
-    document.getElementById('hp-fill').style.width = myStats.hp + "%";
-    document.getElementById('food-fill').style.width = myStats.food + "%";
-    document.getElementById('gold-val').innerText = myStats.gold;
-    localStorage.setItem('nexus_gold', myStats.gold);
-}, 1000);
+socket.on('buildingPlaced', b => spawnBuilding(b));
 
+function spawnBuilding(b) {
+    const model = createBuildingModel(b.type);
+    model.position.set(b.x, 0, b.z);
+    scene.add(model);
+}
+
+// --- CONTROLES ---
+let yaw = 0;
+const keys = {};
 renderer.domElement.onclick = () => renderer.domElement.requestPointerLock();
 document.onmousemove = e => { if(document.pointerLockElement) yaw -= e.movementX * 0.003; };
 window.onkeydown = e => keys[e.code] = true;
@@ -167,14 +140,16 @@ function animate() {
         move.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
         me.position.add(move);
         me.rotation.y = yaw;
-
-        camera.position.copy(me.position).add(new THREE.Vector3(0, 6, 12).applyAxisAngle(new THREE.Vector3(0,1,0), yaw));
+        
+        camera.position.copy(me.position).add(new THREE.Vector3(0, 8, 15).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
         camera.lookAt(me.position);
-        socket.emit('move', { x: me.position.x, y: me.position.y, z: me.position.z });
+        socket.emit('move', { x: me.position.x, y: me.position.y, z: me.position.z, ry: me.rotation.y });
     }
     renderer.render(scene, camera);
 }
 animate();
+
+window.socket = socket; // Pour les onclick
 </script>
 </body>
 </html>
