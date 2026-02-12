@@ -2,27 +2,27 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Nexus Dynasty - HD Textures</title>
+    <title>Nexus Dynasty MULTI-HD</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Arial', sans-serif; }
         .panel { position: absolute; background: rgba(0, 0, 0, 0.85); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; color: white; pointer-events: auto; }
         #stats { top: 10px; left: 10px; display: flex; gap: 20px; font-weight: bold; }
         #menu { bottom: 20px; left: 20px; width: 300px; }
-        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; }
         #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
-        input { padding: 12px; margin: 10px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; }
+        input { padding: 12px; margin: 10px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; font-size: 18px; }
         #trade-msg { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); color: gold; font-weight: bold; font-size: 22px; display: none; text-shadow: 2px 2px #000; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="letter-spacing:10px; color:#00f2ff">NEXUS DYNASTY HD</h1>
-        <input type="text" id="pseudo" placeholder="NOM DU SOUVERAIN">
-        <button class="btn" style="width: 200px;" onclick="connect()">ENTRER DANS LE MONDE</button>
+        <h1 style="letter-spacing:10px; color:#00f2ff;">NEXUS MULTI</h1>
+        <input type="text" id="pseudo" placeholder="PSEUDO">
+        <button class="btn" style="width: 200px;" onclick="connect()">REJOINDRE</button>
     </div>
 
-    <div id="trade-msg">APPUYEZ SUR [E] POUR VENDRE AU MARCHAND</div>
+    <div id="trade-msg">APPUIE SUR [E] POUR VENDRE AU MARCHAND</div>
 
     <div id="stats" class="panel">
         <span>❤️ <span id="hp">100</span></span>
@@ -32,9 +32,9 @@
     </div>
 
     <div id="menu" class="panel">
-        <button class="btn" onclick="buildHouse()">🏠 BÂTIR MAISON (100G)</button>
-        <button class="btn" onclick="addWorker()">🤖 CRÉER MINEUR (150G)</button>
-        <button class="btn" onclick="buyFood()">🍞 ACHETER RATIONS (30G)</button>
+        <button class="btn" onclick="buildHouse()">🏠 POSER MAISON (100G)</button>
+        <button class="btn" onclick="addWorker()">🤖 RECRUTER MINEUR (150G)</button>
+        <button class="btn" onclick="buyFood()">🍞 ACHETER NOURRITURE (30G)</button>
     </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -46,46 +46,27 @@ import * as THREE from 'three';
 const socket = io();
 let scene, camera, renderer, player, merchant, myStats;
 const ores = [], workers = [], houses = [], remotePlayers = {};
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
 
-// --- GÉNÉRATEUR DE TEXTURES CANVA ---
-function generateTexture(type) {
+// --- TEXTURES CANVA ---
+function createTex(c1, c2, isGrass = false) {
     const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 256;
+    canvas.width = 128; canvas.height = 128;
     const ctx = canvas.getContext('2d');
-
-    if(type === 'grass') {
-        ctx.fillStyle = '#2d8a2d';
-        ctx.fillRect(0,0,256,256);
-        for(let i=0; i<2000; i++) {
-            ctx.fillStyle = `rgb(0, ${100 + Math.random()*50}, 0)`;
-            ctx.fillRect(Math.random()*256, Math.random()*256, 2, 5);
-        }
-    } else if(type === 'stone') {
-        ctx.fillStyle = '#555';
-        ctx.fillRect(0,0,256,256);
-        for(let i=0; i<500; i++) {
-            const c = 60 + Math.random()*40;
-            ctx.fillStyle = `rgb(${c},${c},${c})`;
-            ctx.beginPath();
-            ctx.arc(Math.random()*256, Math.random()*256, Math.random()*10, 0, Math.PI*2);
-            ctx.fill();
-        }
-    } else if(type === 'wood') {
-        ctx.fillStyle = '#5d3a1a';
-        ctx.fillRect(0,0,256,256);
-        ctx.strokeStyle = '#3d2610';
-        for(let i=0; i<20; i++) {
-            ctx.lineWidth = 2 + Math.random()*5;
-            ctx.beginPath();
-            ctx.moveTo(0, i*15);
-            ctx.bezierCurveTo(80, i*15 + 20, 160, i*15 - 20, 256, i*15);
-            ctx.stroke();
-        }
-    }
+    ctx.fillStyle = c1; ctx.fillRect(0,0,128,128);
+    ctx.fillStyle = c2;
+    for(let i=0; i<400; i++) ctx.fillRect(Math.random()*128, Math.random()*128, 4, 4);
     const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    if(isGrass) { tex.repeat.set(100, 100); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; }
     return tex;
 }
+
+const textures = {
+    grass: createTex('#2d8a2d', '#1e5e1e', true),
+    stone: createTex('#444', '#666'),
+    wood: createTex('#5d3a1a', '#3d2610')
+};
 
 window.connect = () => {
     const p = document.getElementById('pseudo').value;
@@ -96,54 +77,71 @@ socket.on('authSuccess', (data) => {
     myStats = data.me;
     document.getElementById('login-screen').style.display = 'none';
     initGame();
+    // Afficher les joueurs déjà là
     Object.values(data.allPlayers).forEach(p => { if(p.id !== socket.id) createRemotePlayer(p); });
 });
 
 function initGame() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB);
-    scene.fog = new THREE.FogExp2(0x87CEEB, 0.01);
-
+    scene.background = new THREE.Color(0x87CEEB); // CIEL BIEN BLEU
+    
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const amb = new THREE.AmbientLight(0xffffff, 0.8);
-    const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-    sun.position.set(50, 100, 50);
-    scene.add(amb, sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
-    // SOL AVEC TEXTURE HERBE
-    const grassTex = generateTexture('grass');
-    grassTex.repeat.set(50, 50);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({map: grassTex}));
+    // SOL HERBE
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({map: textures.grass}));
     ground.rotation.x = -Math.PI/2;
     scene.add(ground);
 
-    // JOUEUR
+    // MON JOUEUR
     player = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
-    player.position.y = 1;
+    player.position.set(0, 1, 0);
     scene.add(player);
 
     // MARCHAND
-    merchant = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), new THREE.MeshStandardMaterial({color: 0x9932cc, emissive: 0x220033}));
+    merchant = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), new THREE.MeshStandardMaterial({color: 0x9932cc}));
     merchant.position.set(20, 1.5, 20);
     scene.add(merchant);
 
-    // MINERAIS AVEC TEXTURE PIERRE
-    const stoneTex = generateTexture('stone');
-    const oreGeo = new THREE.DodecahedronGeometry(0.8);
+    // MINERAIS (Gris texturé)
+    const oreGeo = new THREE.IcosahedronGeometry(0.8, 0);
     for(let i=0; i<60; i++) {
-        const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({map: stoneTex}));
+        const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({map: textures.stone}));
         ore.position.set(Math.random()*300-150, 0.5, Math.random()*300-150);
         scene.add(ore);
         ores.push(ore);
     }
 
+    // --- SYSTÈME DE MINAGE FIXÉ ---
+    window.addEventListener('mousedown', (e) => {
+        if(!player) return;
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        
+        const intersects = raycaster.intersectObjects(ores);
+        if(intersects.length > 0) {
+            const hit = intersects[0];
+            if(hit.distance < 10) { // On ne peut miner que si on est proche
+                myStats.oreStock += 5;
+                hit.object.position.set(Math.random()*300-150, 0.5, Math.random()*300-150);
+                socket.emit('saveAll', myStats);
+            }
+        }
+    });
+
+    // MULTIJOUEUR
     socket.on('playerJoined', createRemotePlayer);
-    socket.on('playerMoved', (data) => { if(remotePlayers[data.id]) remotePlayers[data.id].position.set(data.x, 1, data.z); });
-    socket.on('playerLeft', (id) => { scene.remove(remotePlayers[id]); delete remotePlayers[id]; });
+    socket.on('playerMoved', (data) => {
+        if(remotePlayers[data.id]) remotePlayers[data.id].position.set(data.x, 1, data.z);
+    });
+    socket.on('playerLeft', (id) => {
+        if(remotePlayers[id]) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; }
+    });
 
     myStats.houses.forEach(pos => spawnHouseMesh(pos));
     animate();
@@ -159,9 +157,9 @@ function createRemotePlayer(data) {
 const keys = {};
 window.onkeydown = e => {
     keys[e.code] = true;
-    if(e.code === 'KeyE' && player.position.distanceTo(merchant.position) < 5) {
+    if(e.code === 'KeyE' && player.position.distanceTo(merchant.position) < 6) {
         if(myStats.oreStock > 0) {
-            myStats.gold += myStats.oreStock * 15;
+            myStats.gold += myStats.oreStock * 10;
             myStats.oreStock = 0;
             socket.emit('saveAll', myStats);
         }
@@ -173,43 +171,46 @@ function animate() {
     requestAnimationFrame(animate);
     if(!player) return;
 
-    if(keys['KeyW']) player.position.z -= 0.25;
-    if(keys['KeyS']) player.position.z += 0.25;
-    if(keys['KeyA']) player.position.x -= 0.25;
-    if(keys['KeyD']) player.position.x += 0.25;
+    // Déplacement
+    let move = false;
+    if(keys['KeyW']) { player.position.z -= 0.25; move = true; }
+    if(keys['KeyS']) { player.position.z += 0.25; move = true; }
+    if(keys['KeyA']) { player.position.x -= 0.25; move = true; }
+    if(keys['KeyD']) { player.position.x += 0.25; move = true; }
+    
+    if(move) socket.emit('move', {x: player.position.x, z: player.position.z});
 
-    if(keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']) {
-        socket.emit('move', {x: player.position.x, z: player.position.z});
-    }
-
+    // Mineurs Auto
     workers.forEach(w => {
         const target = w.carrying ? w.home.mesh : w.target;
         if(w.mesh.position.distanceTo(target.position) > 2) {
             const dir = new THREE.Vector3().subVectors(target.position, w.mesh.position).normalize();
-            w.mesh.position.add(dir.multiplyScalar(0.16));
+            w.mesh.position.add(dir.multiplyScalar(0.18));
             w.mesh.lookAt(target.position);
         } else {
             if(!w.carrying) w.carrying = true;
-            else { w.home.stored += 1; w.carrying = false; w.target = ores[Math.floor(Math.random()*ores.length)]; }
+            else { w.home.stored += 2; w.carrying = false; w.target = ores[Math.floor(Math.random()*ores.length)]; }
         }
     });
 
+    // Collecte Maisons
     houses.forEach(h => {
         if(player.position.distanceTo(h.mesh.position) < 4) {
             myStats.oreStock += h.stored; h.stored = 0;
         }
     });
 
-    document.getElementById('trade-msg').style.display = player.position.distanceTo(merchant.position) < 5 ? 'block' : 'none';
-    camera.position.lerp(new THREE.Vector3(player.position.x, 25, player.position.z + 25), 0.08);
+    // UI Marchand
+    document.getElementById('trade-msg').style.display = player.position.distanceTo(merchant.position) < 6 ? 'block' : 'none';
+
+    camera.position.lerp(new THREE.Vector3(player.position.x, 30, player.position.z + 30), 0.1);
     camera.lookAt(player.position);
     renderer.render(scene, camera);
     updateUI();
 }
 
 function spawnHouseMesh(pos) {
-    const woodTex = generateTexture('wood');
-    const h = new THREE.Mesh(new THREE.BoxGeometry(4,4,4), new THREE.MeshStandardMaterial({map: woodTex}));
+    const h = new THREE.Mesh(new THREE.BoxGeometry(4,4,4), new THREE.MeshStandardMaterial({map: textures.wood}));
     h.position.set(pos.x, 2, pos.z);
     scene.add(h);
     houses.push({ mesh: h, stored: 0 });
@@ -228,7 +229,7 @@ window.buildHouse = () => {
 window.addWorker = () => {
     if(myStats.gold >= 150 && houses.length > 0) {
         myStats.gold -= 150;
-        const m = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshStandardMaterial({color: 0xffff00, metalness: 0.8, roughness: 0.2}));
+        const m = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshStandardMaterial({color: 0xffff00}));
         m.position.copy(player.position);
         scene.add(m);
         workers.push({ mesh: m, carrying: false, target: ores[0], home: houses[houses.length-1] });
@@ -252,8 +253,8 @@ function updateUI() {
 
 setInterval(() => {
     if(myStats && myStats.hp > 0) {
-        myStats.food -= 0.6;
-        if(myStats.food <= 0) myStats.hp -= 2.5;
+        myStats.food -= 0.5;
+        if(myStats.food <= 0) myStats.hp -= 2;
         socket.emit('saveAll', myStats);
     }
 }, 1000);
