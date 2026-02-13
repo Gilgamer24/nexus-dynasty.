@@ -3,17 +3,35 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const fs = require('fs');
+const path = require('path');
 
 app.use(express.static(__dirname));
 
-let db = { users: {}, globalHouses: [] }; // globalHouses pour le multi
-const DB_PATH = './database.json';
+const DB_PATH = path.join(__dirname, 'database.json');
+let db = { users: {}, globalHouses: [] };
 
+// CHARGEMENT INITIAL
 if (fs.existsSync(DB_PATH)) {
-    try { db = JSON.parse(fs.readFileSync(DB_PATH)); } catch (e) { console.log("Erreur DB"); }
+    try {
+        const rawData = fs.readFileSync(DB_PATH);
+        db = JSON.parse(rawData);
+        console.log("✅ Base de données chargée !");
+    } catch (e) {
+        console.log("⚠️ Erreur lecture DB, on repart à zéro.");
+    }
+} else {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db));
+    console.log("📝 Fichier database.json créé !");
 }
 
-function save() { fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2)); }
+function save() {
+    try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+        console.log("💾 Progression sauvegardée sur le disque.");
+    } catch (e) {
+        console.error("❌ Erreur de sauvegarde :", e);
+    }
+}
 
 let players = {};
 
@@ -22,17 +40,16 @@ io.on('connection', (socket) => {
         const pseudo = data.pseudo;
         if (!db.users[pseudo]) {
             db.users[pseudo] = { pseudo, gold: 300, food: 100, oreStock: 0 };
+            save();
         }
         socket.userId = pseudo;
         players[socket.id] = { id: socket.id, pseudo, x: 0, z: 0 };
         
-        // Envoyer l'état actuel au nouveau joueur
         socket.emit('initData', { 
             me: db.users[pseudo], 
             houses: db.globalHouses,
             players: players 
         });
-        
         socket.broadcast.emit('playerJoined', players[socket.id]);
     });
 
@@ -46,7 +63,7 @@ io.on('connection', (socket) => {
 
     socket.on('newHouse', (houseData) => {
         db.globalHouses.push(houseData);
-        io.emit('houseBuilt', houseData); // Tout le monde voit la maison
+        io.emit('houseBuilt', houseData);
         save();
     });
 
@@ -63,4 +80,5 @@ io.on('connection', (socket) => {
     });
 });
 
-http.listen(3000, () => console.log("Nexus Dynasty X6 - Online"));
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => console.log(`🚀 Serveur actif sur le port ${PORT}`));
