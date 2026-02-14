@@ -10,37 +10,27 @@ app.use(express.static(__dirname));
 const DB_PATH = path.join(__dirname, 'database.json');
 let db = { users: {}, globalHouses: [] };
 
-// CHARGEMENT INITIAL
+// Chargement sécurisé
 if (fs.existsSync(DB_PATH)) {
     try {
-        const rawData = fs.readFileSync(DB_PATH);
-        db = JSON.parse(rawData);
-        console.log("✅ Base de données chargée !");
-    } catch (e) {
-        console.log("⚠️ Erreur lecture DB, on repart à zéro.");
-    }
-} else {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db));
-    console.log("📝 Fichier database.json créé !");
+        const raw = fs.readFileSync(DB_PATH, 'utf-8');
+        if (raw) db = JSON.parse(raw);
+        console.log("✅ Base de données chargée.");
+    } catch (e) { console.log("⚠️ Fichier DB corrompu, reset."); }
 }
 
 function save() {
-    try {
-        fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-        console.log("💾 Progression sauvegardée sur le disque.");
-    } catch (e) {
-        console.error("❌ Erreur de sauvegarde :", e);
-    }
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+    console.log("💾 Sauvegarde disque réussie.");
 }
 
 let players = {};
 
 io.on('connection', (socket) => {
     socket.on('login', (data) => {
-        const pseudo = data.pseudo;
+        const pseudo = data.pseudo || "Joueur";
         if (!db.users[pseudo]) {
-            db.users[pseudo] = { pseudo, gold: 300, food: 100, oreStock: 0 };
-            save();
+            db.users[pseudo] = { pseudo, gold: 500, food: 100, oreStock: 0 };
         }
         socket.userId = pseudo;
         players[socket.id] = { id: socket.id, pseudo, x: 0, z: 0 };
@@ -51,6 +41,7 @@ io.on('connection', (socket) => {
             players: players 
         });
         socket.broadcast.emit('playerJoined', players[socket.id]);
+        save();
     });
 
     socket.on('move', (pos) => {
@@ -81,4 +72,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(`🚀 Serveur actif sur le port ${PORT}`));
+http.listen(PORT, () => console.log(`Serveur prêt sur le port ${PORT}`));
