@@ -1,8 +1,11 @@
 {
   "name": "nexus-dynasty",
   "version": "1.0.0",
-  "description": "Jeu complet Nexus Dynasty",
+  "description": "Jeu Nexus Dynasty sur Render",
   "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
