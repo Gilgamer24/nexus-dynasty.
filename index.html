@@ -2,26 +2,26 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Nexus Dynasty X6 - Pro IA</title>
+    <title>Nexus Dynasty - Plot System</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
         .ui { position: absolute; inset: 0; pointer-events: none; }
-        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; border-radius: 12px; color: white; pointer-events: auto; box-shadow: 0 0 15px rgba(0,242,255,0.3); }
+        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; color: white; pointer-events: auto; }
         #stats { top: 15px; left: 15px; display: flex; gap: 20px; font-weight: bold; font-size: 18px; }
         #menu { bottom: 20px; left: 20px; width: 300px; }
-        .btn { width: 100%; padding: 12px; margin: 6px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; border-radius: 6px; }
+        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; border-radius: 5px; }
         .btn:hover { background: #00f2ff; color: #000; }
-        #login-screen { position: absolute; inset: 0; background: radial-gradient(circle, #001a1a 0%, #000 100%); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 15px; margin: 15px; width: 280px; background: #000; border: 2px solid #00f2ff; color: white; text-align: center; font-size: 16px; border-radius: 8px; }
-        .label { position: absolute; color: #fff; font-weight: bold; font-size: 12px; text-shadow: 0 0 5px #000; pointer-events: none; text-align: center; transform: translate(-50%, -100%); }
+        #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { padding: 15px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; margin-bottom: 10px; }
+        .label { position: absolute; color: white; font-weight: bold; font-size: 12px; pointer-events: none; text-align: center; transform: translate(-50%, -100%); }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="color:#00f2ff; letter-spacing: 12px; font-size: 40px; text-shadow: 0 0 20px #00f2ff;">NEXUS DYNASTY</h1>
-        <input type="text" id="pseudo" placeholder="PSEUDO DU COMMANDANT">
-        <button class="btn" style="width: 250px;" onclick="connect()">INITIALISER CONNEXION</button>
+        <h1 style="color:#00f2ff; letter-spacing: 10px;">NEXUS DYNASTY</h1>
+        <input type="text" id="pseudo" placeholder="NOM DU ROYAUME">
+        <button class="btn" style="width: 220px;" onclick="connect()">ENTRER</button>
     </div>
 
     <div class="ui">
@@ -29,12 +29,13 @@
             <span style="color:#ffd700">💰 <span id="gold">0</span></span>
             <span style="color:#4dff4d">🍞 <span id="food">100</span></span>
             <span style="color:#00f2ff">📦 <span id="ore">0</span></span>
+            <span style="color:#00f2ff; margin-left:10px;">🚩 PLOT: <span id="plotID">?</span></span>
         </div>
         <div id="menu" class="panel">
-            <button class="btn" style="background:#ffd700; color:#000;" onclick="tpToVendor()">🚀 CENTRE DE VENTE</button>
-            <button class="btn" onclick="buildHouse()">🏠 POSER UNITÉ D'HABITATION (100G)</button>
-            <button class="btn" onclick="addWorker()">🤖 ACTIVER MINEUR IA (150G)</button>
-            <button class="btn" onclick="buyFood()">🍞 RÉAPPROVISIONNER VIVRES (30G)</button>
+            <button class="btn" style="border-color:#aa00ff; color:#aa00ff;" onclick="tpToVendor()">💜 VENDEUR VIOLET</button>
+            <button class="btn" onclick="buildHouse()">🏠 BÂTIR (SUR MON PLOT)</button>
+            <button class="btn" onclick="addWorker()">🤖 MINEUR IA</button>
+            <button class="btn" style="border-color:#00ff00; color:#00ff00;" onclick="tpToLoot()">💚 ZONE DE LOOT</button>
         </div>
     </div>
 
@@ -47,8 +48,8 @@
 import * as THREE from 'three';
 
 const socket = io();
-let scene, camera, renderer, player, vendor, myStats;
-const ores = [], workers = [], houses = [], remotePlayers = {};
+let scene, camera, renderer, player, myStats;
+const ores = [], workers = [], houses = [], plots = [], remotePlayers = {};
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const keys = {};
@@ -61,146 +62,103 @@ window.connect = () => {
 socket.on('initData', (data) => {
     myStats = data.me;
     document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('plotID').innerText = myStats.plotID;
     initGame();
-    data.houses.forEach(h => spawnHouseMesh(h.x, h.z, true));
+    data.houses.forEach(h => spawnHouseMesh(h.x, h.z));
     Object.values(data.players).forEach(p => { if(p.id !== socket.id) createRemotePlayer(p); });
 });
 
 function initGame() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x00050a);
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 4000);
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 5000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const amb = new THREE.AmbientLight(0xffffff, 0.4); scene.add(amb);
-    const sun = new THREE.PointLight(0x00f2ff, 1, 2000); sun.position.set(0, 500, 0); scene.add(sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.5); sun.position.set(10, 50, 10); scene.add(sun);
 
-    // SOL JOLI (Dark Cyber)
-    const groundGeo = new THREE.PlaneGeometry(3000, 3000);
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.8 });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI/2;
-    scene.add(ground);
+    // SOL CYBER
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({color: 0x050505}));
+    ground.rotation.x = -Math.PI/2; scene.add(ground);
+    scene.add(new THREE.GridHelper(4000, 100, 0x00f2ff, 0x001515));
 
-    const grid = new THREE.GridHelper(3000, 60, 0x00f2ff, 0x001111);
-    grid.position.y = 0.1;
-    scene.add(grid);
+    // LES 8 TERRAINS (Comme sur le dessin)
+    for(let i=0; i<8; i++) {
+        const x = -150 + (i % 4) * 100;
+        const z = i < 4 ? -80 : 80;
+        const helper = new THREE.BoxHelper(new THREE.Mesh(new THREE.BoxGeometry(80, 0.1, 80)));
+        helper.position.set(x, 0, z);
+        helper.material.color.set(i+1 === myStats.plotID ? 0x00ff00 : 0x333333);
+        scene.add(helper);
+        plots.push({ id: i+1, x, z });
+    }
 
-    vendor = createChar(0xff00ff, true);
-    vendor.position.set(15, 0, 15);
-    scene.add(vendor);
+    // VENDEUR VIOLET (A gauche)
+    const vendor = createChar(0xaa00ff); vendor.position.set(-350, 0, 0); scene.add(vendor);
+
+    // ZONE DE LOOT (A droite)
+    const lootZone = new THREE.Mesh(new THREE.CircleGeometry(30, 32), new THREE.MeshBasicMaterial({color: 0x00ff00, transparent:true, opacity:0.2}));
+    lootZone.rotation.x = -Math.PI/2; lootZone.position.set(350, 0, 0); scene.add(lootZone);
 
     player = createChar(0x00f2ff);
+    const myPlot = plots.find(p => p.id === myStats.plotID);
+    player.position.set(myPlot.x, 0, myPlot.z);
     scene.add(player);
 
-    // MINERAIS (Gros cristaux)
-    const oreGeo = new THREE.IcosahedronGeometry(1.5, 0);
-    for(let i=0; i<150; i++) {
-        const crystal = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({color: 0x444444, emissive: 0x222222}));
-        crystal.position.set(Math.random()*1200-600, 1, Math.random()*1200-600);
-        scene.add(crystal);
-        ores.push(crystal);
-    }
+    for(let i=0; i<100; i++) spawnOre();
     animate();
 }
 
-function createChar(color, hat = false) {
+function spawnOre() {
+    const ore = new THREE.Mesh(new THREE.DodecahedronGeometry(1.5), new THREE.MeshStandardMaterial({color: 0x555}));
+    ore.position.set(Math.random()*800-400, 1, Math.random()*400-200);
+    scene.add(ore);
+    ores.push(ore);
+}
+
+function createChar(color) {
     const g = new THREE.Group();
-    const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.2), new THREE.MeshStandardMaterial({color}));
-    b.position.y = 0.85; g.add(b);
-    if(hat) {
-        const h = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, 1), new THREE.MeshStandardMaterial({color: 0x000}));
-        h.position.y = 1.6; g.add(h);
-    }
+    const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.6, 1.2), new THREE.MeshStandardMaterial({color}));
+    b.position.y = 0.9; g.add(b);
     return g;
 }
 
+function spawnHouseMesh(x, z) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshStandardMaterial({color: 0x111111}));
+    b.position.set(x, 3, z);
+    scene.add(b);
+    houses.push({ mesh: b, label: createLabel() });
+}
+
 function createLabel() {
-    const div = document.createElement('div');
-    div.className = 'label';
+    const div = document.createElement('div'); div.className = 'label';
     document.getElementById('labels-container').appendChild(div);
     return div;
 }
 
-socket.on('playerJoined', (p) => createRemotePlayer(p));
-socket.on('playerMoved', (p) => { if(remotePlayers[p.id]) remotePlayers[p.id].position.set(p.x, 0, p.z); });
-socket.on('playerLeft', (id) => { if(remotePlayers[id]) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; }});
-socket.on('houseBuilt', (h) => spawnHouseMesh(h.x, h.z, false));
-
-function createRemotePlayer(d) {
-    const p = createChar(0xff4444);
-    p.position.set(d.x, 0, d.z);
-    scene.add(p);
-    remotePlayers[d.id] = p;
-}
-
-function spawnHouseMesh(x, z, instant) {
-    const g = new THREE.Group();
-    const b = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 6), new THREE.MeshStandardMaterial({color: 0x111111, wireframe: false}));
-    b.position.y = 2; g.add(b);
-    const glow = new THREE.BoxGeometry(6.2, 0.1, 6.2);
-    const glowM = new THREE.MeshBasicMaterial({color: 0x00f2ff});
-    const gL = new THREE.Mesh(glow, glowM); gL.position.y = 4; g.add(gL);
-    
-    g.position.set(x, 0, z);
-    scene.add(g);
-
-    const data = { mesh: g, stored: 0, progress: instant?100:0, label: createLabel() };
-    houses.push(data);
-
-    if(!instant) {
-        let itv = setInterval(() => {
-            data.progress += 2;
-            b.scale.y = data.progress/100;
-            if(data.progress >= 100) { clearInterval(itv); b.material.color.set(0x222222); }
-        }, 100);
-    }
-}
-
-window.tpToVendor = () => { player.position.set(20, 0, 20); };
+window.tpToVendor = () => player.position.set(-330, 0, 0);
+window.tpToLoot = () => player.position.set(330, 0, 0);
 
 window.buildHouse = () => {
-    if(myStats.gold >= 100) {
-        myStats.gold -= 100;
-        socket.emit('newHouse', { x: player.position.x, z: player.position.z });
-        socket.emit('updatePlayer', myStats);
-    }
+    const myPlot = plots.find(p => p.id === myStats.plotID);
+    if(player.position.distanceTo(new THREE.Vector3(myPlot.x, 0, myPlot.z)) < 40) {
+        if(myStats.gold >= 100) {
+            myStats.gold -= 100;
+            socket.emit('newHouse', { x: player.position.x, z: player.position.z });
+            socket.emit('updatePlayer', myStats);
+        }
+    } else { alert("Ici c'est pas chez toi !"); }
 };
 
 window.addWorker = () => {
-    const rdy = houses.filter(h => h.progress >= 100);
-    if(myStats.gold >= 150 && rdy.length > 0) {
+    if(myStats.gold >= 150) {
         myStats.gold -= 150;
-        const wMesh = createChar(0xffff00, true);
-        wMesh.position.copy(player.position);
-        scene.add(wMesh);
-        // IA : state: 'move_to_ore', 'mining', 'return'
-        workers.push({ mesh: wMesh, energy: 100, state: 'move_to_ore', home: rdy[rdy.length-1], label: createLabel(), target: ores[Math.floor(Math.random()*ores.length)], wait: 0 });
+        const w = createChar(0xffff00); w.position.copy(player.position); scene.add(w);
+        workers.push({ mesh: w, energy: 100, state: 'find', home: player.position.clone(), target: null, label: createLabel() });
         socket.emit('updatePlayer', myStats);
     }
 };
-
-window.buyFood = () => { if(myStats.gold >= 30) { myStats.gold -= 30; myStats.food += 60; socket.emit('updatePlayer', myStats); } };
-
-window.addEventListener('mousedown', (e) => {
-    mouse.x = (e.clientX/window.innerWidth)*2-1;
-    mouse.y = -(e.clientY/window.innerHeight)*2+1;
-    raycaster.setFromCamera(mouse, camera);
-
-    const hitWorkers = raycaster.intersectObjects(workers.map(w=>w.mesh), true);
-    if(hitWorkers.length > 0 && myStats.food >= 20) {
-        const w = workers.find(work => work.mesh === hitWorkers[0].object.parent || work.mesh === hitWorkers[0].object);
-        if(w && w.state === 'tired') { myStats.food -= 20; w.energy = 100; w.state = 'move_to_ore'; }
-    }
-
-    if(player.position.distanceTo(vendor.position) < 6 && myStats.oreStock > 0) {
-        myStats.gold += myStats.oreStock * 5;
-        myStats.oreStock = 0;
-        socket.emit('updatePlayer', myStats);
-    }
-});
 
 window.onkeydown = e => keys[e.code] = true;
 window.onkeyup = e => keys[e.code] = false;
@@ -209,7 +167,7 @@ function animate() {
     requestAnimationFrame(animate);
     if(!player) return;
 
-    const speed = keys['ShiftLeft'] ? 1.2 : 0.6;
+    const speed = keys['ShiftLeft'] ? 1.5 : 0.7;
     if(keys['KeyW']) player.position.z -= speed;
     if(keys['KeyS']) player.position.z += speed;
     if(keys['KeyA']) player.position.x -= speed;
@@ -220,70 +178,50 @@ function animate() {
         player.lookAt(player.position.x + (keys['KeyD']?1:keys['KeyA']?-1:0), 0, player.position.z + (keys['KeyS']?1:keys['KeyW']?-1:0));
     }
 
-    // IA AMELIORÉE DES ROBOTS
+    // IA MINEURS
     workers.forEach(w => {
         const p = w.mesh.position.clone().project(camera);
         w.label.style.left = (p.x+1)*50+'%'; w.label.style.top = -(p.y-1)*50+'%';
-        w.label.innerText = w.state==='tired'?'💤':'⚡'+Math.floor(w.energy)+'%';
-        
-        if(w.state === 'tired') {
-            const d = w.mesh.position.distanceTo(w.home.mesh.position);
-            if(d > 3) {
-                const dir = new THREE.Vector3().subVectors(w.home.mesh.position, w.mesh.position).normalize();
-                w.mesh.position.add(dir.multiplyScalar(0.2)); w.mesh.lookAt(w.home.mesh.position);
-            }
-        } else if (w.state === 'move_to_ore') {
+        w.label.innerText = `🤖 ${Math.floor(w.energy)}%`;
+
+        if(w.state === 'find') {
+            w.target = ores[Math.floor(Math.random()*ores.length)];
+            w.state = 'move';
+        } else if(w.state === 'move') {
             if(w.mesh.position.distanceTo(w.target.position) > 2) {
                 const dir = new THREE.Vector3().subVectors(w.target.position, w.mesh.position).normalize();
-                w.mesh.position.add(dir.multiplyScalar(0.35)); w.mesh.lookAt(w.target.position);
+                w.mesh.position.add(dir.multiplyScalar(0.6)); w.mesh.lookAt(w.target.position);
             } else {
-                w.state = 'mining';
-                w.wait = 120; // 2 secondes à 60fps
+                // ACTION : CASSE LE BLOC
+                w.target.visible = false; // Disparaît
+                w.target.position.set(Math.random()*800-400, 1, Math.random()*400-200);
+                setTimeout(() => { w.target.visible = true; }, 5000); // Repop
+                w.energy -= 20; w.state = 'return';
             }
-        } else if (w.state === 'mining') {
-            w.wait--;
-            w.mesh.rotation.y += 0.5; // Le robot tourne sur lui-même quand il mine
-            if(w.wait <= 0) {
-                w.state = 'return';
-                w.energy -= 20;
-                // Le minerai "disparait" et réapparait ailleurs
-                w.target.position.set(Math.random()*1200-600, 1, Math.random()*1200-600);
-            }
-        } else if (w.state === 'return') {
-            if(w.mesh.position.distanceTo(w.home.mesh.position) > 3) {
-                const dir = new THREE.Vector3().subVectors(w.home.mesh.position, w.mesh.position).normalize();
-                w.mesh.position.add(dir.multiplyScalar(0.3)); w.mesh.lookAt(w.home.mesh.position);
+        } else if(w.state === 'return') {
+            if(w.mesh.position.distanceTo(w.home) > 3) {
+                const dir = new THREE.Vector3().subVectors(w.home, w.mesh.position).normalize();
+                w.mesh.position.add(dir.multiplyScalar(0.6)); w.mesh.lookAt(w.home);
             } else {
-                w.home.stored += 15;
-                if(w.energy <= 0) w.state = 'tired';
-                else w.state = 'move_to_ore';
-                w.target = ores[Math.floor(Math.random()*ores.length)];
+                myStats.oreStock += 10; w.state = w.energy > 0 ? 'find' : 'tired';
             }
         }
     });
 
-    houses.forEach(h => {
-        const p = h.mesh.position.clone().project(camera);
-        h.label.style.left = (p.x+1)*50+'%'; h.label.style.top = -(p.y-1)*50+'%';
-        h.label.innerText = h.progress < 100 ? 'CONSTRUCTION...' : 'UNITÉ STOCK: '+h.stored;
-        if(h.progress>=100 && player.position.distanceTo(h.mesh.position) < 6 && h.stored > 0) {
-            myStats.oreStock += h.stored; h.stored = 0; socket.emit('updatePlayer', myStats);
-        }
-    });
+    // VENTE AUTO AU VENDEUR VIOLET (-350, 0, 0)
+    if(player.position.distanceTo(new THREE.Vector3(-350, 0, 0)) < 15 && myStats.oreStock > 0) {
+        myStats.gold += myStats.oreStock * 5; myStats.oreStock = 0;
+        socket.emit('updatePlayer', myStats);
+    }
 
-    camera.position.lerp(new THREE.Vector3(player.position.x, 60, player.position.z + 50), 0.08);
+    camera.position.lerp(new THREE.Vector3(player.position.x, 100, player.position.z + 80), 0.1);
     camera.lookAt(player.position);
     renderer.render(scene, camera);
-    updateUI();
-}
-
-function updateUI() {
+    
     document.getElementById('gold').innerText = Math.floor(myStats.gold);
     document.getElementById('food').innerText = Math.floor(myStats.food);
     document.getElementById('ore').innerText = Math.floor(myStats.oreStock);
 }
-
-setInterval(() => { if(myStats) { myStats.food -= 0.15; socket.emit('updatePlayer', myStats); } }, 1000);
 </script>
 </body>
 </html>
