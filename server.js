@@ -5,66 +5,57 @@ const io = require('socket.io')(http);
 const fs = require('fs');
 const path = require('path');
 
-// Configuration des fichiers statiques
+// Dossier statique
 app.use(express.static(__dirname));
 
+// Fichier de sauvegarde
 const DB_PATH = path.join(__dirname, 'database.json');
+let db = { users: {}, globalHouses: [] };
 
-// Structure initiale de la base de données
-let db = { 
-    users: {}, 
-    globalHouses: [] 
-};
-
-// Chargement de la base de données au démarrage
+// Chargement de la sauvegarde si elle existe
 if (fs.existsSync(DB_PATH)) {
     try {
-        const data = fs.readFileSync(DB_PATH, 'utf8');
-        if (data) {
-            db = JSON.parse(data);
-            console.log("✅ Base de données database.json chargée avec succès.");
-        }
-    } catch (err) {
-        console.error("⚠️ Erreur de lecture du JSON, initialisation d'une nouvelle base.");
+        db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+        console.log("✅ Base de données chargée.");
+    } catch (e) {
+        console.log("⚠️ Création d'une nouvelle base de données.");
     }
 }
 
-// Fonction de sauvegarde sécurisée
-function saveDB() {
-    try {
-        fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-        console.log("💾 Modification enregistrée dans database.json");
-    } catch (err) {
-        console.error("❌ Erreur lors de l'écriture du fichier :", err);
-    }
+// Fonction de sauvegarde
+function save() {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
 }
 
 let players = {};
 
 io.on('connection', (socket) => {
-    console.log(`🔌 Nouvelle connexion : ${socket.id}`);
+    console.log(`Connexion : ${socket.id}`);
 
     socket.on('login', (data) => {
-        const pseudo = data.pseudo || "Anonyme";
+        const pseudo = data.pseudo || "Joueur";
         
-        // Si l'utilisateur n'existe pas, on lui crée un compte et on lui donne un terrain (Plot)
+        // Création du compte si nouveau
         if (!db.users[pseudo]) {
-            // Attribution d'un terrain entre 1 et 8 basé sur le nombre de joueurs inscrits
+            // Assigne un terrain de 1 à 8
             const plotID = (Object.keys(db.users).length % 8) + 1;
             
             db.users[pseudo] = { 
                 pseudo: pseudo, 
-                gold: 500, 
-                food: 100, 
-                oreStock: 0, 
-                plotID: plotID 
+                gold: 500,        // Argent de départ
+                wood: 0,          // Bois
+                oreStock: 0,      // Minerai dans l'inventaire
+                plotID: plotID,   // Numéro du terrain
+                privateHouses: [], // Maisons dans la zone privée
+                workersCount: 0   // Nombre de robots achetés
             };
-            saveDB();
+            save();
+            console.log(`✨ Nouveau seigneur : ${pseudo} (Plot #${plotID})`);
         }
 
         socket.userId = pseudo;
         
-        // On enregistre sa position temporaire pour le multi
+        // Initialisation du joueur en ligne
         players[socket.id] = { 
             id: socket.id, 
             pseudo: pseudo, 
@@ -73,99 +64,38 @@ io.on('connection', (socket) => {
             plotID: db.users[pseudo].plotID 
         };
 
-        // Envoi des données initiales au joueur (ses stats + les maisons existantes + les autres joueurs)
+        // Envoi des infos au client
         socket.emit('initData', { 
             me: db.users[pseudo], 
-            houses: db.globalHouses, 
             players: players 
         });
 
-        // Informe les autres qu'un joueur est arrivé
+        // Prévenir les autres (pour le futur multi)
         socket.broadcast.emit('playerJoined', players[socket.id]);
     });
 
-    // Mise à jour de la position pour le multijoueur
-    socket.on('move', (pos) => {
-        if (players[socket.id]) {
-            players[socket.id].x = pos.x;
-            players[socket.id].z = pos.z;
-            socket.broadcast.emit('playerMoved', players[socket.id]);
+    // Sauvegarde des stats (Or, Bois, etc.) reçues du client
+    socket.on('updatePlayer', (data) => {
+        if(socket.userId) {
+            db.users[socket.userId] = data;
+            save();
         }
     });
 
-    // Enregistrement d'une nouvelle maison (Construction)
-    socket.on('newHouse', (houseData) => {
-        // On ajoute le pseudo du propriétaire à la maison
-        const newHouse = { ...houseData, owner: socket.userId };
-        db.globalHouses.push(newHouse);
-        
-        // On diffuse la nouvelle maison à tout le monde
-        io.emit('houseBuilt', newHouse);
-        saveDB();
-    });
-
-    // Mise à jour des stats (Gold, Food, Ore)
-    socket.on('updatePlayer', (updatedStats) => {
-        if (socket.userId && db.users[socket.userId]) {
-            db.users[socket.userId] = updatedStats;
-            saveDB();
-        }
-    });
-
+    // Gestion de la déconnexion
     socket.on('disconnect', () => {
-        console.log(`❌ Déconnexion : ${socket.id}`);
-        io.emit('playerLeft', socket.id);
+        console.log(`Déconnexion : ${socket.id}`);
         delete players[socket.id];
     });
 });
 
+// Lancement du serveur
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log(`
-    ===========================================
-    🚀 SERVEUR NEXUS DYNASTY ACTIF
-    📍 URL : http://localhost:${PORT}
-    💾 Base de données : database.json
-    ===========================================
+    =========================================
+    🚀 SERVEUR NEXUS DYNASTY EN LIGNE
+    📍 Adresse : http://localhost:${PORT}
+    =========================================
     `);
 });
-const express = require('express');
-const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
-const fs = require('fs');
-const path = require('path');
-
-app.use(express.static(__dirname));
-const DB_PATH = path.join(__dirname, 'database.json');
-let db = { users: {}, globalHouses: [] };
-
-if (fs.existsSync(DB_PATH)) {
-    try { db = JSON.parse(fs.readFileSync(DB_PATH)); } catch (e) {}
-}
-
-function save() { fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2)); }
-
-let players = {};
-
-io.on('connection', (socket) => {
-    socket.on('login', (data) => {
-        const pseudo = data.pseudo || "Joueur";
-        if (!db.users[pseudo]) {
-            const plotID = (Object.keys(db.users).length % 8) + 1;
-            db.users[pseudo] = { pseudo, gold: 500, wood: 0, plotID, privateHouses: [] };
-            save();
-        }
-        socket.userId = pseudo;
-        players[socket.id] = { id: socket.id, pseudo, x: 0, z: 0, plotID: db.users[pseudo].plotID, zone: 'lobby' };
-        socket.emit('initData', { me: db.users[pseudo], players });
-    });
-
-    socket.on('updatePlayer', (data) => {
-        if(socket.userId) { db.users[socket.userId] = data; save(); }
-    });
-
-    socket.on('disconnect', () => { delete players[socket.id]; });
-});
-
-http.listen(3000, () => console.log("Serveur Multi-Zones OK"));
