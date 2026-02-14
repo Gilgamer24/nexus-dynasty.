@@ -56,3 +56,17 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => console.log(`Dynasty Server Running on ${PORT}`));
+// ... (garder le début du fichier précédent)
+socket.on('login', (data) => {
+    const pseudo = data.pseudo || "Inconnu";
+    if (!db.users[pseudo]) {
+        db.users[pseudo] = { 
+            pseudo, gold: 300, wood: 0, stone: 0,
+            hp: 100, hunger: 100,
+            axeLvl: 1, swordLvl: 1,
+            house: { lvl: 1, x: 0, z: 0, built: false, storage: 0, workers: 0 }
+        };
+        save();
+    }
+    // ... reste du login
+});
