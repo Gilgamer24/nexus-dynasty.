@@ -225,3 +225,220 @@ function animate() {
 </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Nexus Dynasty - Dimensions</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        .ui { position: absolute; inset: 0; pointer-events: none; }
+        .panel { position: absolute; background: rgba(0,0,0,0.8); border: 2px solid #fff; padding: 15px; color: white; pointer-events: auto; border-radius: 10px; }
+        #stats { top: 10px; left: 10px; display: flex; gap: 20px; border-color: #4CAF50; }
+        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 20px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 10px; display: none; }
+        #menu { bottom: 20px; left: 20px; }
+        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #222; color: #fff; border: 1px solid #fff; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="msg">APPUIE SUR [E] POUR ENTRER</div>
+
+    <div class="ui">
+        <div id="stats" class="panel">
+            <span style="color:#ffd700">💰 <span id="gold">0</span></span>
+            <span style="color:#8B4513">🪵 <span id="wood">0</span></span>
+            <span id="zone-name" style="margin-left:20px; color:#4CAF50;">LOBBY</span>
+        </div>
+        <div id="menu" class="panel">
+            <button class="btn" onclick="buildHouse()">🏠 BÂTIR MAISON (50 BOIS)</button>
+        </div>
+    </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+const socket = io();
+let scene, camera, renderer, player, myStats;
+let currentZone = 'lobby'; // lobby, private, forest
+const keys = {}, trees = [], lobbyHouses = [];
+
+// --- INITIALISATION ---
+const pseudo = prompt("Ton Pseudo:");
+if(pseudo) socket.emit('login', { pseudo });
+
+socket.on('initData', (data) => {
+    myStats = data.me;
+    initScene();
+});
+
+function initScene() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 10000);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const amb = new THREE.AmbientLight(0xffffff, 0.8); scene.add(amb);
+    
+    loadLobby();
+    
+    player = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color: 0x00ff00}));
+    body.position.y = 1; player.add(body);
+    scene.add(player);
+
+    animate();
+}
+
+// --- LES ZONES ---
+
+function loadLobby() {
+    currentZone = 'lobby';
+    document.getElementById('zone-name').innerText = "LOBBY";
+    clearScene();
+    
+    // Sol Herbe
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({color: 0x2d5a27}));
+    ground.rotation.x = -Math.PI/2; scene.add(ground);
+
+    // 8 Maisons en cercle
+    for(let i=0; i<8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const x = Math.cos(angle) * 40;
+        const z = Math.sin(angle) * 40;
+        const h = new THREE.Mesh(new THREE.BoxGeometry(10, 8, 10), new THREE.MeshStandardMaterial({color: i+1 === myStats.plotID ? 0xff0000 : 0x888888}));
+        h.position.set(x, 4, z);
+        h.lookAt(0, 4, 0);
+        scene.add(h);
+        lobbyHouses.push({ mesh: h, id: i+1 });
+    }
+
+    // Zone Verte (Portail Forêt)
+    const portal = new THREE.Mesh(new THREE.CircleGeometry(5, 32), new THREE.MeshBasicMaterial({color: 0x00ff00}));
+    portal.position.set(0, 0.1, 0); portal.rotation.x = -Math.PI/2;
+    scene.add(portal);
+}
+
+function loadPrivateZone() {
+    currentZone = 'private';
+    document.getElementById('zone-name').innerText = "MA ZONE PRIVÉE";
+    clearScene();
+    player.position.set(0,0,0);
+
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({color: 0x3d7a37}));
+    ground.rotation.x = -Math.PI/2; ground.position.set(5000, 0, 5000); scene.add(ground);
+    player.position.set(5000, 0, 5000);
+
+    myStats.privateHouses.forEach(h => spawnVisualHouse(h.x, h.z));
+}
+
+function loadForest() {
+    currentZone = 'forest';
+    document.getElementById('zone-name').innerText = "FORÊT (COUPER ARBRES)";
+    clearScene();
+    player.position.set(-5000, 0, -5000);
+
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({color: 0x1a3317}));
+    ground.rotation.x = -Math.PI/2; ground.position.set(-5000, 0, -5000); scene.add(ground);
+
+    for(let i=0; i<50; i++) {
+        const tx = -5000 + (Math.random()*300-150);
+        const tz = -5000 + (Math.random()*300-150);
+        spawnTree(tx, tz);
+    }
+}
+
+function clearScene() {
+    trees.length = 0;
+    // On garde juste le player et la lumière
+}
+
+// --- OBJETS ---
+
+function spawnTree(x, z) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 4), new THREE.MeshStandardMaterial({color: 0x4d2600}));
+    log.position.set(x, 2, z);
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshStandardMaterial({color: 0x00ff00}));
+    leaf.position.y = 3; log.add(leaf);
+    scene.add(log);
+    trees.push(log);
+}
+
+function spawnVisualHouse(x, z) {
+    const h = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshStandardMaterial({color: 0xdddddd}));
+    h.position.set(x, 3, z);
+    scene.add(h);
+}
+
+// --- ACTIONS ---
+
+window.buildHouse = () => {
+    if(currentZone === 'private' && myStats.wood >= 50) {
+        myStats.wood -= 50;
+        const pos = { x: player.position.x, z: player.position.z };
+        myStats.privateHouses.push(pos);
+        spawnVisualHouse(pos.x, pos.z);
+        socket.emit('updatePlayer', myStats);
+    } else { alert("Il faut être dans ta zone et avoir 50 bois !"); }
+};
+
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if(e.code === 'KeyE') {
+        // TP ZONE PRIVÉE
+        if(currentZone === 'lobby') {
+            const myHouse = lobbyHouses.find(h => h.id === myStats.plotID);
+            if(player.position.distanceTo(myHouse.mesh.position) < 15) loadPrivateZone();
+            else if(player.position.distanceTo(new THREE.Vector3(0,0,0)) < 10) loadForest();
+        } else { loadLobby(); } // Retour au Lobby
+    }
+});
+window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+function animate() {
+    requestAnimationFrame(animate);
+    
+    // Deplacement
+    const s = 0.8;
+    if(keys['KeyW']) player.position.z -= s;
+    if(keys['KeyS']) player.position.z += s;
+    if(keys['KeyA']) player.position.x -= s;
+    if(keys['KeyD']) player.position.x += s;
+
+    // Interaction Arbres
+    if(currentZone === 'forest') {
+        trees.forEach((t, i) => {
+            if(t.visible && player.position.distanceTo(t.position) < 3) {
+                t.visible = false;
+                myStats.wood += 10;
+                socket.emit('updatePlayer', myStats);
+            }
+        });
+    }
+
+    // UI Feedback
+    const msg = document.getElementById('msg');
+    if(currentZone === 'lobby') {
+        const myHouse = lobbyHouses.find(h => h.id === myStats.plotID);
+        if(player.position.distanceTo(myHouse.mesh.position) < 15) {
+            msg.style.display = 'block'; msg.innerText = "APPUIE SUR [E] POUR ENTRER CHEZ TOI";
+        } else if(player.position.distanceTo(new THREE.Vector3(0,0,0)) < 10) {
+            msg.style.display = 'block'; msg.innerText = "APPUIE SUR [E] POUR ALLER À LA FORÊT";
+        } else { msg.style.display = 'none'; }
+    } else { msg.style.display = 'none'; }
+
+    camera.position.set(player.position.x, player.position.y + 60, player.position.z + 40);
+    camera.lookAt(player.position);
+    
+    document.getElementById('gold').innerText = myStats.gold;
+    document.getElementById('wood').innerText = myStats.wood;
+    
+    renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
