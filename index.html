@@ -2,40 +2,86 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Nexus Dynasty - Plot System</title>
+    <title>Nexus Dynasty - Version Complete</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; }
+        
+        /* INTERFACE UTILISATEUR (HUD) */
         .ui { position: absolute; inset: 0; pointer-events: none; }
-        .panel { position: absolute; background: rgba(0, 10, 20, 0.9); border: 2px solid #00f2ff; padding: 15px; border-radius: 10px; color: white; pointer-events: auto; }
-        #stats { top: 15px; left: 15px; display: flex; gap: 20px; font-weight: bold; font-size: 18px; }
+        .panel { 
+            position: absolute; 
+            background: rgba(0, 15, 30, 0.9); 
+            border: 2px solid #00f2ff; 
+            padding: 15px; 
+            color: white; 
+            pointer-events: auto; 
+            border-radius: 8px; 
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+        }
+
+        #stats { top: 15px; left: 15px; display: flex; gap: 25px; font-weight: bold; font-size: 20px; }
+        
+        #msg { 
+            position: absolute; top: 60%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            color: #00f2ff; font-size: 26px; font-weight: bold; 
+            display: none; text-shadow: 0 0 10px #00f2ff; text-align: center; 
+            background: rgba(0,0,0,0.7); padding: 20px; border: 1px solid #00f2ff;
+        }
+
         #menu { bottom: 20px; left: 20px; width: 300px; }
-        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #001a1a; color: #00f2ff; border: 1px solid #00f2ff; cursor: pointer; font-weight: bold; border-radius: 5px; }
-        .btn:hover { background: #00f2ff; color: #000; }
-        #login-screen { position: absolute; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        input { padding: 15px; width: 250px; background: #111; border: 1px solid #00f2ff; color: white; text-align: center; margin-bottom: 10px; }
-        .label { position: absolute; color: white; font-weight: bold; font-size: 12px; pointer-events: none; text-align: center; transform: translate(-50%, -100%); }
+        
+        .btn { 
+            width: 100%; padding: 12px; margin: 6px 0; 
+            background: #001a1a; color: #00f2ff; 
+            border: 1px solid #00f2ff; cursor: pointer; 
+            font-weight: bold; text-transform: uppercase; 
+            transition: 0.2s; font-family: 'Courier New', monospace;
+        }
+        .btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 15px #00f2ff; }
+
+        /* ÉCRAN DE CONNEXION */
+        #login-screen { 
+            position: absolute; inset: 0; background: #000; z-index: 10000; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+        }
+        input { 
+            padding: 15px; width: 250px; background: #111; 
+            border: 2px solid #00f2ff; color: white; 
+            text-align: center; font-size: 18px; margin-bottom: 20px; outline: none;
+        }
+
+        /* LABELS DES ROBOTS */
+        .label { 
+            position: absolute; color: #ffff00; font-weight: bold; 
+            font-size: 12px; transform: translate(-50%, -100%); 
+            pointer-events: none; text-shadow: 1px 1px 2px black; 
+        }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="color:#00f2ff; letter-spacing: 10px;">NEXUS DYNASTY</h1>
+        <h1 style="color:#00f2ff; font-size: 40px; text-shadow: 0 0 20px #00f2ff;">NEXUS DYNASTY</h1>
         <input type="text" id="pseudo" placeholder="NOM DU ROYAUME">
-        <button class="btn" style="width: 220px;" onclick="connect()">ENTRER</button>
+        <button class="btn" style="width: 200px;" onclick="connect()">INITIALISATION</button>
     </div>
+
+    <div id="msg"></div>
 
     <div class="ui">
         <div id="stats" class="panel">
-            <span style="color:#ffd700">💰 <span id="gold">0</span></span>
-            <span style="color:#4dff4d">🍞 <span id="food">100</span></span>
-            <span style="color:#00f2ff">📦 <span id="ore">0</span></span>
-            <span style="color:#00f2ff; margin-left:10px;">🚩 PLOT: <span id="plotID">?</span></span>
+            <span style="color:#ffd700">💰 OR: <span id="gold">0</span></span>
+            <span style="color:#8B4513">🪵 BOIS: <span id="wood">0</span></span>
+            <span style="color:#aaa">⛏️ MINERAI: <span id="ore">0</span></span>
         </div>
+        
         <div id="menu" class="panel">
-            <button class="btn" style="border-color:#aa00ff; color:#aa00ff;" onclick="tpToVendor()">💜 VENDEUR VIOLET</button>
-            <button class="btn" onclick="buildHouse()">🏠 BÂTIR (SUR MON PLOT)</button>
-            <button class="btn" onclick="addWorker()">🤖 MINEUR IA</button>
-            <button class="btn" style="border-color:#00ff00; color:#00ff00;" onclick="tpToLoot()">💚 ZONE DE LOOT</button>
+            <div id="zone-indicator" style="color:#00f2ff; margin-bottom:10px; text-align:center; font-weight:bold; border-bottom:1px solid #00f2ff; padding-bottom:5px;">ZONE : LOBBY</div>
+            
+            <button class="btn" onclick="buildHouse()">🏠 BÂTIR (50 BOIS)</button>
+            <button class="btn" onclick="addWorker()">🤖 ROBOT (150 OR)</button>
+            <button class="btn" onclick="goLobby()" style="border-color:#ff4444; color:#ff4444;">🚪 RETOUR LOBBY</button>
         </div>
     </div>
 
@@ -49,11 +95,17 @@ import * as THREE from 'three';
 
 const socket = io();
 let scene, camera, renderer, player, myStats;
-const ores = [], workers = [], houses = [], plots = [], remotePlayers = {};
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const keys = {};
+let currentZone = 'lobby'; // États possibles: 'lobby', 'private', 'forest'
 
+// Tableaux pour stocker les objets du jeu
+const keys = {};
+const trees = [];
+const ores = [];
+const workers = [];
+const visuals = [];
+const lobbyHouses = [];
+
+// --- CONNEXION ---
 window.connect = () => {
     const p = document.getElementById('pseudo').value;
     if(p) socket.emit('login', { pseudo: p });
@@ -62,381 +114,378 @@ window.connect = () => {
 socket.on('initData', (data) => {
     myStats = data.me;
     document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('plotID').innerText = myStats.plotID;
     initGame();
-    data.houses.forEach(h => spawnHouseMesh(h.x, h.z));
-    Object.values(data.players).forEach(p => { if(p.id !== socket.id) createRemotePlayer(p); });
 });
 
+// --- INITIALISATION DU MOTEUR 3D ---
 function initGame() {
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 5000);
+    scene.background = new THREE.Color(0x000510); // Ciel sombre bleuté
+    scene.fog = new THREE.Fog(0x000510, 20, 150);
+
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+    
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.5); sun.position.set(10, 50, 10); scene.add(sun);
+    // Lumières
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+    sun.position.set(50, 100, 50);
+    sun.castShadow = true;
+    scene.add(sun);
 
-    // SOL CYBER
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({color: 0x050505}));
-    ground.rotation.x = -Math.PI/2; scene.add(ground);
-    scene.add(new THREE.GridHelper(4000, 100, 0x00f2ff, 0x001515));
-
-    // LES 8 TERRAINS (Comme sur le dessin)
-    for(let i=0; i<8; i++) {
-        const x = -150 + (i % 4) * 100;
-        const z = i < 4 ? -80 : 80;
-        const helper = new THREE.BoxHelper(new THREE.Mesh(new THREE.BoxGeometry(80, 0.1, 80)));
-        helper.position.set(x, 0, z);
-        helper.material.color.set(i+1 === myStats.plotID ? 0x00ff00 : 0x333333);
-        scene.add(helper);
-        plots.push({ id: i+1, x, z });
-    }
-
-    // VENDEUR VIOLET (A gauche)
-    const vendor = createChar(0xaa00ff); vendor.position.set(-350, 0, 0); scene.add(vendor);
-
-    // ZONE DE LOOT (A droite)
-    const lootZone = new THREE.Mesh(new THREE.CircleGeometry(30, 32), new THREE.MeshBasicMaterial({color: 0x00ff00, transparent:true, opacity:0.2}));
-    lootZone.rotation.x = -Math.PI/2; lootZone.position.set(350, 0, 0); scene.add(lootZone);
-
-    player = createChar(0x00f2ff);
-    const myPlot = plots.find(p => p.id === myStats.plotID);
-    player.position.set(myPlot.x, 0, myPlot.z);
+    // Création du Joueur
+    player = createChar(0x00f2ff); // Bleu cyan
     scene.add(player);
 
-    for(let i=0; i<100; i++) spawnOre();
+    // Démarrage dans le Lobby
+    goLobby();
     animate();
 }
 
-function spawnOre() {
-    const ore = new THREE.Mesh(new THREE.DodecahedronGeometry(1.5), new THREE.MeshStandardMaterial({color: 0x555}));
-    ore.position.set(Math.random()*800-400, 1, Math.random()*400-200);
-    scene.add(ore);
-    ores.push(ore);
+// --- NETTOYAGE DE LA SCÈNE (Quand on change de zone) ---
+function clearZone() {
+    visuals.forEach(v => scene.remove(v));
+    trees.forEach(t => scene.remove(t));
+    ores.forEach(o => scene.remove(o));
+    workers.forEach(w => { scene.remove(w.mesh); w.label.remove(); });
+    
+    visuals.length = 0; 
+    trees.length = 0; 
+    ores.length = 0; 
+    workers.length = 0;
+    lobbyHouses.length = 0;
 }
+
+// =========================================================
+//                   LES 3 ZONES DU JEU
+// =========================================================
+
+// 1. LE LOBBY (Centre commun)
+window.goLobby = () => {
+    currentZone = 'lobby';
+    document.getElementById('zone-indicator').innerText = "ZONE : LOBBY COMMUN";
+    clearZone();
+    player.position.set(0, 0, 30); // Spawn point
+    
+    // Sol Futuriste
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({color: 0x111111}));
+    ground.rotation.x = -Math.PI/2; 
+    scene.add(ground); visuals.push(ground);
+    
+    const grid = new THREE.GridHelper(400, 40, 0x00f2ff, 0x002222);
+    scene.add(grid); visuals.push(grid);
+
+    // 8 Maisons en cercle
+    for(let i=0; i<8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const dist = 60;
+        const x = Math.cos(angle) * dist;
+        const z = Math.sin(angle) * dist;
+        
+        // Couleur: Verte si c'est la mienne, Grise sinon
+        const isMine = (i + 1 === myStats.plotID);
+        const color = isMine ? 0x00ff00 : 0x444444;
+        
+        const houseGroup = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(10, 8, 10), new THREE.MeshStandardMaterial({color: color}));
+        base.position.y = 4;
+        houseGroup.add(base);
+        
+        // Petit toit
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(7, 4, 4), new THREE.MeshStandardMaterial({color: 0x222222}));
+        roof.position.y = 9; roof.rotation.y = Math.PI/4;
+        houseGroup.add(roof);
+
+        houseGroup.position.set(x, 0, z);
+        houseGroup.lookAt(0, 0, 0);
+        
+        scene.add(houseGroup); visuals.push(houseGroup);
+        lobbyHouses.push({ mesh: houseGroup, id: i + 1, isMine: isMine });
+    }
+
+    // Portail Vert (vers la Forêt)
+    const portal = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 1, 32), new THREE.MeshBasicMaterial({color: 0x00ff00, transparent: true, opacity: 0.4}));
+    portal.position.set(0, 0.5, 0);
+    scene.add(portal); visuals.push(portal);
+    
+    // Texte flottant au dessus du portail (simple mesh)
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 50, 8), new THREE.MeshBasicMaterial({color: 0x00ff00, transparent: true, opacity: 0.2}));
+    beam.position.set(0, 25, 0);
+    scene.add(beam); visuals.push(beam);
+
+    // Vendeur Violet (Négociant)
+    const vendor = createChar(0xaa00ff);
+    vendor.position.set(-80, 0, 0);
+    vendor.rotation.y = Math.PI/2;
+    scene.add(vendor); visuals.push(vendor);
+}
+
+// 2. LA ZONE PRIVÉE (Herbe + Mineurs)
+function goPrivate() {
+    currentZone = 'private';
+    document.getElementById('zone-indicator').innerText = "ZONE : TERRAIN PRIVÉ";
+    clearZone();
+    player.position.set(2000, 0, 2000); // Loin dans la map
+
+    // Sol Herbe
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.MeshStandardMaterial({color: 0x2d5a27}));
+    ground.rotation.x = -Math.PI/2; ground.position.set(2000, 0, 2000);
+    scene.add(ground); visuals.push(ground);
+
+    // Faire apparaître mes robots
+    for(let i=0; i<myStats.workersCount; i++) spawnWorkerIA();
+    
+    // Faire apparaître du minerai aléatoire
+    for(let i=0; i<40; i++) {
+        spawnOre(2000 + (Math.random()*400-200), 2000 + (Math.random()*400-200));
+    }
+    
+    // Faire apparaître mes maisons construites
+    myStats.privateHouses.forEach(pos => spawnVisualHouse(pos.x, pos.z));
+}
+
+// 3. LA FORÊT (Arbres)
+function goForest() {
+    currentZone = 'forest';
+    document.getElementById('zone-indicator').innerText = "ZONE : FORÊT SACRÉE";
+    clearZone();
+    player.position.set(-2000, 0, -2000); // Loin a l'opposé
+
+    // Sol Terre Sombre
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.MeshStandardMaterial({color: 0x1a3317}));
+    ground.rotation.x = -Math.PI/2; ground.position.set(-2000, 0, -2000);
+    scene.add(ground); visuals.push(ground);
+
+    // Génération d'arbres
+    for(let i=0; i<100; i++) {
+        spawnTree(-2000 + (Math.random()*500-250), -2000 + (Math.random()*500-250));
+    }
+}
+
+// =========================================================
+//                   CRÉATION D'OBJETS
+// =========================================================
 
 function createChar(color) {
     const g = new THREE.Group();
-    const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.6, 1.2), new THREE.MeshStandardMaterial({color}));
-    b.position.y = 0.9; g.add(b);
+    // Corps
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.2), new THREE.MeshStandardMaterial({color: color}));
+    body.position.y = 1; 
+    g.add(body);
     return g;
 }
 
-function spawnHouseMesh(x, z) {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshStandardMaterial({color: 0x111111}));
-    b.position.set(x, 3, z);
-    scene.add(b);
-    houses.push({ mesh: b, label: createLabel() });
+function spawnTree(x, z) {
+    const t = new THREE.Group();
+    // Tronc
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 4), new THREE.MeshStandardMaterial({color: 0x3d2817}));
+    trunk.position.y = 2; t.add(trunk);
+    // Feuillage
+    const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(2.5), new THREE.MeshStandardMaterial({color: 0x228B22}));
+    leaves.position.y = 5; t.add(leaves);
+    
+    t.position.set(x, 0, z);
+    scene.add(t); 
+    trees.push(t);
 }
 
-function createLabel() {
-    const div = document.createElement('div'); div.className = 'label';
+function spawnOre(x, z) {
+    // Minerai gris brillant
+    const o = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2), new THREE.MeshStandardMaterial({color: 0x888888, roughness: 0.2, metalness: 0.8}));
+    o.position.set(x, 1, z);
+    scene.add(o);
+    ores.push(o);
+}
+
+function spawnVisualHouse(x, z) {
+    const h = new THREE.Mesh(new THREE.BoxGeometry(12, 10, 12), new THREE.MeshStandardMaterial({color: 0xdddddd}));
+    h.position.set(x, 5, z);
+    scene.add(h); visuals.push(h);
+}
+
+function spawnWorkerIA() {
+    const w = createChar(0xffff00); // Robot Jaune
+    w.position.copy(player.position); 
+    scene.add(w);
+    
+    // Label HTML pour le robot
+    const div = document.createElement('div'); div.className = 'label'; 
     document.getElementById('labels-container').appendChild(div);
-    return div;
+    
+    workers.push({ 
+        mesh: w, 
+        energy: 100, 
+        state: 'find', // États: find (chercher), move (aller), return (revenir)
+        home: player.position.clone(), 
+        target: null, 
+        label: div 
+    });
 }
 
-window.tpToVendor = () => player.position.set(-330, 0, 0);
-window.tpToLoot = () => player.position.set(330, 0, 0);
-
-window.buildHouse = () => {
-    const myPlot = plots.find(p => p.id === myStats.plotID);
-    if(player.position.distanceTo(new THREE.Vector3(myPlot.x, 0, myPlot.z)) < 40) {
-        if(myStats.gold >= 100) {
-            myStats.gold -= 100;
-            socket.emit('newHouse', { x: player.position.x, z: player.position.z });
-            socket.emit('updatePlayer', myStats);
-        }
-    } else { alert("Ici c'est pas chez toi !"); }
-};
+// =========================================================
+//                   INTERACTIONS & BOUTONS
+// =========================================================
 
 window.addWorker = () => {
-    if(myStats.gold >= 150) {
-        myStats.gold -= 150;
-        const w = createChar(0xffff00); w.position.copy(player.position); scene.add(w);
-        workers.push({ mesh: w, energy: 100, state: 'find', home: player.position.clone(), target: null, label: createLabel() });
-        socket.emit('updatePlayer', myStats);
-    }
+    if(currentZone === 'private') {
+        if(myStats.gold >= 150) {
+            myStats.gold -= 150; 
+            myStats.workersCount++;
+            spawnWorkerIA(); 
+            socket.emit('updatePlayer', myStats);
+        } else { alert("Pas assez d'or (150 requis) !"); }
+    } else { alert("Tu dois être dans ta zone privée !"); }
 };
 
-window.onkeydown = e => keys[e.code] = true;
-window.onkeyup = e => keys[e.code] = false;
+window.buildHouse = () => {
+    if(currentZone === 'private') {
+        if(myStats.wood >= 50) {
+            myStats.wood -= 50; 
+            const p = {x: player.position.x, z: player.position.z};
+            myStats.privateHouses.push(p); 
+            spawnVisualHouse(p.x, p.z);
+            socket.emit('updatePlayer', myStats);
+        } else { alert("Pas assez de bois (50 requis) !"); }
+    } else { alert("Tu dois être dans ta zone privée !"); }
+};
 
+// Gestion du clavier (ZQSD / WASD + E)
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+
+    // Touche E pour les interactions spéciales
+    if(e.code === 'KeyE' && currentZone === 'lobby') {
+        // 1. Entrer chez soi (Distance < 15 d'une maison verte)
+        const myH = lobbyHouses.find(h => h.isMine);
+        if(myH && player.position.distanceTo(myH.mesh.position) < 15) {
+            goPrivate();
+        }
+        
+        // 2. Entrer dans la forêt (Distance < 15 du centre 0,0)
+        if(player.position.distanceTo(new THREE.Vector3(0,0,0)) < 15) {
+            goForest();
+        }
+    }
+});
+
+window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+// =========================================================
+//                   BOUCLE PRINCIPALE (ANIMATION)
+// =========================================================
 function animate() {
     requestAnimationFrame(animate);
+    
     if(!player) return;
 
-    const speed = keys['ShiftLeft'] ? 1.5 : 0.7;
+    // --- DÉPLACEMENT JOUEUR ---
+    const speed = 0.8;
     if(keys['KeyW']) player.position.z -= speed;
     if(keys['KeyS']) player.position.z += speed;
     if(keys['KeyA']) player.position.x -= speed;
     if(keys['KeyD']) player.position.x += speed;
 
-    if(keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']) {
-        socket.emit('move', {x: player.position.x, z: player.position.z});
-        player.lookAt(player.position.x + (keys['KeyD']?1:keys['KeyA']?-1:0), 0, player.position.z + (keys['KeyS']?1:keys['KeyW']?-1:0));
-    }
+    // Caméra Suiveuse
+    camera.position.set(player.position.x, player.position.y + 60, player.position.z + 50);
+    camera.lookAt(player.position);
 
-    // IA MINEURS
+    // --- LOGIQUE IA (ROBOTS) ---
     workers.forEach(w => {
-        const p = w.mesh.position.clone().project(camera);
-        w.label.style.left = (p.x+1)*50+'%'; w.label.style.top = -(p.y-1)*50+'%';
+        // Mise à jour du label au dessus de la tête
+        const sp = w.mesh.position.clone().project(camera);
+        w.label.style.left = (sp.x + 1) * 50 + '%'; 
+        w.label.style.top = -(sp.y - 1) * 50 + '%';
         w.label.innerText = `🤖 ${Math.floor(w.energy)}%`;
 
         if(w.state === 'find') {
-            w.target = ores[Math.floor(Math.random()*ores.length)];
-            w.state = 'move';
-        } else if(w.state === 'move') {
+            // Cherche un minerai visible
+            w.target = ores.find(o => o.visible); 
+            if(w.target) w.state = 'move';
+        } 
+        else if(w.state === 'move' && w.target) {
+            // Avance vers le minerai
             if(w.mesh.position.distanceTo(w.target.position) > 2) {
                 const dir = new THREE.Vector3().subVectors(w.target.position, w.mesh.position).normalize();
-                w.mesh.position.add(dir.multiplyScalar(0.6)); w.mesh.lookAt(w.target.position);
+                w.mesh.position.add(dir.multiplyScalar(0.5)); 
+                w.mesh.lookAt(w.target.position);
             } else {
-                // ACTION : CASSE LE BLOC
-                w.target.visible = false; // Disparaît
-                w.target.position.set(Math.random()*800-400, 1, Math.random()*400-200);
-                setTimeout(() => { w.target.visible = true; }, 5000); // Repop
-                w.energy -= 20; w.state = 'return';
+                // MINE LE BLOC
+                w.target.visible = false; // Disparition
+                
+                // Repop ailleurs
+                w.target.position.set(2000+(Math.random()*400-200), 1, 2000+(Math.random()*400-200));
+                setTimeout(() => w.target.visible = true, 5000);
+                
+                w.energy -= 10; 
+                w.state = 'return';
             }
-        } else if(w.state === 'return') {
-            if(w.mesh.position.distanceTo(w.home) > 3) {
-                const dir = new THREE.Vector3().subVectors(w.home, w.mesh.position).normalize();
-                w.mesh.position.add(dir.multiplyScalar(0.6)); w.mesh.lookAt(w.home);
+        } 
+        else if(w.state === 'return') {
+            // Revient vers le joueur (la base)
+            if(w.mesh.position.distanceTo(player.position) > 3) {
+                const dir = new THREE.Vector3().subVectors(player.position, w.mesh.position).normalize();
+                w.mesh.position.add(dir.multiplyScalar(0.5)); 
+                w.mesh.lookAt(player.position);
             } else {
-                myStats.oreStock += 10; w.state = w.energy > 0 ? 'find' : 'tired';
+                // Dépose les ressources
+                myStats.oreStock += 5; 
+                socket.emit('updatePlayer', myStats);
+                w.state = 'find'; // Repart au travail
             }
         }
     });
 
-    // VENTE AUTO AU VENDEUR VIOLET (-350, 0, 0)
-    if(player.position.distanceTo(new THREE.Vector3(-350, 0, 0)) < 15 && myStats.oreStock > 0) {
-        myStats.gold += myStats.oreStock * 5; myStats.oreStock = 0;
-        socket.emit('updatePlayer', myStats);
-    }
-
-    camera.position.lerp(new THREE.Vector3(player.position.x, 100, player.position.z + 80), 0.1);
-    camera.lookAt(player.position);
-    renderer.render(scene, camera);
-    
-    document.getElementById('gold').innerText = Math.floor(myStats.gold);
-    document.getElementById('food').innerText = Math.floor(myStats.food);
-    document.getElementById('ore').innerText = Math.floor(myStats.oreStock);
-}
-</script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Nexus Dynasty - Dimensions</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
-        .ui { position: absolute; inset: 0; pointer-events: none; }
-        .panel { position: absolute; background: rgba(0,0,0,0.8); border: 2px solid #fff; padding: 15px; color: white; pointer-events: auto; border-radius: 10px; }
-        #stats { top: 10px; left: 10px; display: flex; gap: 20px; border-color: #4CAF50; }
-        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 20px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 10px; display: none; }
-        #menu { bottom: 20px; left: 20px; }
-        .btn { width: 100%; padding: 10px; margin: 5px 0; background: #222; color: #fff; border: 1px solid #fff; cursor: pointer; }
-    </style>
-</head>
-<body>
-
-    <div id="msg">APPUIE SUR [E] POUR ENTRER</div>
-
-    <div class="ui">
-        <div id="stats" class="panel">
-            <span style="color:#ffd700">💰 <span id="gold">0</span></span>
-            <span style="color:#8B4513">🪵 <span id="wood">0</span></span>
-            <span id="zone-name" style="margin-left:20px; color:#4CAF50;">LOBBY</span>
-        </div>
-        <div id="menu" class="panel">
-            <button class="btn" onclick="buildHouse()">🏠 BÂTIR MAISON (50 BOIS)</button>
-        </div>
-    </div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"}}</script>
-
-<script type="module">
-import * as THREE from 'three';
-
-const socket = io();
-let scene, camera, renderer, player, myStats;
-let currentZone = 'lobby'; // lobby, private, forest
-const keys = {}, trees = [], lobbyHouses = [];
-
-// --- INITIALISATION ---
-const pseudo = prompt("Ton Pseudo:");
-if(pseudo) socket.emit('login', { pseudo });
-
-socket.on('initData', (data) => {
-    myStats = data.me;
-    initScene();
-});
-
-function initScene() {
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 10000);
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const amb = new THREE.AmbientLight(0xffffff, 0.8); scene.add(amb);
-    
-    loadLobby();
-    
-    player = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1), new THREE.MeshStandardMaterial({color: 0x00ff00}));
-    body.position.y = 1; player.add(body);
-    scene.add(player);
-
-    animate();
-}
-
-// --- LES ZONES ---
-
-function loadLobby() {
-    currentZone = 'lobby';
-    document.getElementById('zone-name').innerText = "LOBBY";
-    clearScene();
-    
-    // Sol Herbe
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({color: 0x2d5a27}));
-    ground.rotation.x = -Math.PI/2; scene.add(ground);
-
-    // 8 Maisons en cercle
-    for(let i=0; i<8; i++) {
-        const angle = (i / 8) * Math.PI * 2;
-        const x = Math.cos(angle) * 40;
-        const z = Math.sin(angle) * 40;
-        const h = new THREE.Mesh(new THREE.BoxGeometry(10, 8, 10), new THREE.MeshStandardMaterial({color: i+1 === myStats.plotID ? 0xff0000 : 0x888888}));
-        h.position.set(x, 4, z);
-        h.lookAt(0, 4, 0);
-        scene.add(h);
-        lobbyHouses.push({ mesh: h, id: i+1 });
-    }
-
-    // Zone Verte (Portail Forêt)
-    const portal = new THREE.Mesh(new THREE.CircleGeometry(5, 32), new THREE.MeshBasicMaterial({color: 0x00ff00}));
-    portal.position.set(0, 0.1, 0); portal.rotation.x = -Math.PI/2;
-    scene.add(portal);
-}
-
-function loadPrivateZone() {
-    currentZone = 'private';
-    document.getElementById('zone-name').innerText = "MA ZONE PRIVÉE";
-    clearScene();
-    player.position.set(0,0,0);
-
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({color: 0x3d7a37}));
-    ground.rotation.x = -Math.PI/2; ground.position.set(5000, 0, 5000); scene.add(ground);
-    player.position.set(5000, 0, 5000);
-
-    myStats.privateHouses.forEach(h => spawnVisualHouse(h.x, h.z));
-}
-
-function loadForest() {
-    currentZone = 'forest';
-    document.getElementById('zone-name').innerText = "FORÊT (COUPER ARBRES)";
-    clearScene();
-    player.position.set(-5000, 0, -5000);
-
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({color: 0x1a3317}));
-    ground.rotation.x = -Math.PI/2; ground.position.set(-5000, 0, -5000); scene.add(ground);
-
-    for(let i=0; i<50; i++) {
-        const tx = -5000 + (Math.random()*300-150);
-        const tz = -5000 + (Math.random()*300-150);
-        spawnTree(tx, tz);
-    }
-}
-
-function clearScene() {
-    trees.length = 0;
-    // On garde juste le player et la lumière
-}
-
-// --- OBJETS ---
-
-function spawnTree(x, z) {
-    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 4), new THREE.MeshStandardMaterial({color: 0x4d2600}));
-    log.position.set(x, 2, z);
-    const leaf = new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshStandardMaterial({color: 0x00ff00}));
-    leaf.position.y = 3; log.add(leaf);
-    scene.add(log);
-    trees.push(log);
-}
-
-function spawnVisualHouse(x, z) {
-    const h = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshStandardMaterial({color: 0xdddddd}));
-    h.position.set(x, 3, z);
-    scene.add(h);
-}
-
-// --- ACTIONS ---
-
-window.buildHouse = () => {
-    if(currentZone === 'private' && myStats.wood >= 50) {
-        myStats.wood -= 50;
-        const pos = { x: player.position.x, z: player.position.z };
-        myStats.privateHouses.push(pos);
-        spawnVisualHouse(pos.x, pos.z);
-        socket.emit('updatePlayer', myStats);
-    } else { alert("Il faut être dans ta zone et avoir 50 bois !"); }
-};
-
-window.addEventListener('keydown', (e) => {
-    keys[e.code] = true;
-    if(e.code === 'KeyE') {
-        // TP ZONE PRIVÉE
-        if(currentZone === 'lobby') {
-            const myHouse = lobbyHouses.find(h => h.id === myStats.plotID);
-            if(player.position.distanceTo(myHouse.mesh.position) < 15) loadPrivateZone();
-            else if(player.position.distanceTo(new THREE.Vector3(0,0,0)) < 10) loadForest();
-        } else { loadLobby(); } // Retour au Lobby
-    }
-});
-window.addEventListener('keyup', (e) => keys[e.code] = false);
-
-function animate() {
-    requestAnimationFrame(animate);
-    
-    // Deplacement
-    const s = 0.8;
-    if(keys['KeyW']) player.position.z -= s;
-    if(keys['KeyS']) player.position.z += s;
-    if(keys['KeyA']) player.position.x -= s;
-    if(keys['KeyD']) player.position.x += s;
-
-    // Interaction Arbres
+    // --- LOGIQUE FORÊT (Couper du bois) ---
     if(currentZone === 'forest') {
-        trees.forEach((t, i) => {
-            if(t.visible && player.position.distanceTo(t.position) < 3) {
-                t.visible = false;
-                myStats.wood += 10;
-                socket.emit('updatePlayer', myStats);
+        trees.forEach(t => { 
+            if(t.visible && player.position.distanceTo(t.position) < 4) { 
+                t.visible = false; // Arbre coupé
+                myStats.wood += 5; 
+                socket.emit('updatePlayer', myStats); 
             }
         });
     }
 
-    // UI Feedback
-    const msg = document.getElementById('msg');
+    // --- LOGIQUE VENDEUR (Lobby) ---
     if(currentZone === 'lobby') {
-        const myHouse = lobbyHouses.find(h => h.id === myStats.plotID);
-        if(player.position.distanceTo(myHouse.mesh.position) < 15) {
-            msg.style.display = 'block'; msg.innerText = "APPUIE SUR [E] POUR ENTRER CHEZ TOI";
-        } else if(player.position.distanceTo(new THREE.Vector3(0,0,0)) < 10) {
-            msg.style.display = 'block'; msg.innerText = "APPUIE SUR [E] POUR ALLER À LA FORÊT";
-        } else { msg.style.display = 'none'; }
-    } else { msg.style.display = 'none'; }
+        const vendorPos = new THREE.Vector3(-80, 0, 0);
+        if(player.position.distanceTo(vendorPos) < 10) {
+            if(myStats.oreStock > 0) { 
+                myStats.gold += myStats.oreStock * 10; // 1 minerai = 10 Or
+                myStats.oreStock = 0; 
+                socket.emit('updatePlayer', myStats); 
+            }
+        }
+    }
 
-    camera.position.set(player.position.x, player.position.y + 60, player.position.z + 40);
-    camera.lookAt(player.position);
+    // --- GESTION DE L'AFFICHAGE DU MESSAGE [E] ---
+    const msg = document.getElementById('msg'); 
+    msg.style.display = 'none';
     
-    document.getElementById('gold').innerText = myStats.gold;
-    document.getElementById('wood').innerText = myStats.wood;
-    
+    if(currentZone === 'lobby') {
+        // Devant ma maison ?
+        const myH = lobbyHouses.find(h => h.isMine);
+        if(myH && player.position.distanceTo(myH.mesh.position) < 15) { 
+            msg.style.display = 'block'; 
+            msg.innerText = "MAISON #" + myStats.plotID + "\n[E] ENTRER CHEZ TOI"; 
+        }
+        // Devant le portail forêt ?
+        if(player.position.distanceTo(new THREE.Vector3(0,0,0)) < 15) { 
+            msg.style.display = 'block'; 
+            msg.innerText = "PORTAIL FORÊT\n[E] TÉLÉPORTATION"; 
+        }
+    }
+
+    // Mise à jour de l'UI
+    document.getElementById('gold').innerText = Math.floor(myStats.gold);
+    document.getElementById('wood').innerText = Math.floor(myStats.wood);
+    document.getElementById('ore').innerText = Math.floor(myStats.oreStock);
+
     renderer.render(scene, camera);
 }
 </script>
