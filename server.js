@@ -61,7 +61,7 @@ socket.on('login', (data) => {
     const pseudo = data.pseudo || "Inconnu";
     if (!db.users[pseudo]) {
         db.users[pseudo] = { 
-            pseudo, gold: 300, wood: 0, stone: 0,
+            pseudo, gold: 1000, wood: 0, stone: 0,
             hp: 100, hunger: 100,
             axeLvl: 1, swordLvl: 1,
             house: { lvl: 1, x: 0, z: 0, built: false, storage: 0, workers: 0 }
